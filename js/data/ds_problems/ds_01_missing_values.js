@@ -126,7 +126,7 @@ tests = []
 
 # 1. Age Null count is 0
 age_nulls = int(result_df['Age'].isnull().sum())
-test1_passed = (age_nulls == 0)
+test1_passed = bool(age_nulls == 0)
 tests.append({
     "test": "결측치 완전 제거 검증",
     "passed": test1_passed,
@@ -138,7 +138,7 @@ p1_val = result_df.loc[1, 'Age'] # was None, should be 45.0
 p2_val = result_df.loc[6, 'Age'] # was None, should be 29.0
 p3_val = result_df.loc[11, 'Age'] # was None, should be 22.0
 
-test2_passed = (p1_val == 45.0 and p2_val == 29.0 and p3_val == 22.0)
+test2_passed = bool(p1_val == 45.0 and p2_val == 29.0 and p3_val == 22.0)
 tests.append({
     "test": "등급별 중앙값 정확도 검증",
     "passed": test2_passed,
@@ -146,16 +146,16 @@ tests.append({
 })
 
 # 3. Shape & other columns unchanged
-shape_match = (result_df.shape == (15, 5))
-other_cols_intact = (result_df['Fare'].equals(sample_df['Fare']))
-test3_passed = shape_match and other_cols_intact
+shape_match = bool(result_df.shape == (15, 5))
+other_cols_intact = bool(result_df['Fare'].equals(sample_df['Fare']))
+test3_passed = bool(shape_match and other_cols_intact)
 tests.append({
     "test": "데이터 왜곡 및 형상 보존 검증",
     "passed": test3_passed,
     "detail": f"Shape: {result_df.shape}, 타 컬럼 보존 여부: {other_cols_intact}"
 })
 
-all_passed = all(t['passed'] for t in tests)
+all_passed = bool(all(bool(t['passed']) for t in tests))
 
 return {
     "all_passed": all_passed,

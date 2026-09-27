@@ -185,6 +185,24 @@ def serialize_df_for_web(df, max_rows=15):
         "dtypes": {str(k): str(v) for k, v in df.dtypes.items()}
     }
 
+def ds_json_default(obj):
+    if isinstance(obj, (np.bool_, bool)):
+        return bool(obj)
+    if isinstance(obj, (np.integer, int)):
+        return int(obj)
+    if isinstance(obj, (np.floating, float)):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, (pd.Timestamp, pd.Timedelta)):
+        return str(obj)
+    if hasattr(obj, "item"):
+        try:
+            return obj.item()
+        except Exception:
+            pass
+    return str(obj)
+
 def run_ds_judge(user_code, problem_id, validation_code):
     user_globals = {
         "pd": pd,
@@ -201,14 +219,14 @@ def run_ds_judge(user_code, problem_id, validation_code):
             "success": False,
             "error_type": "CompileError",
             "error": traceback.format_exc()
-        })
+        }, default=ds_json_default)
         
     if "solution" not in user_globals or not callable(user_globals["solution"]):
         return json.dumps({
             "success": False,
             "error_type": "EntryPointNotFound",
             "error": "함수 'solution(df)'를 찾을 수 없습니다."
-        })
+        }, default=ds_json_default)
         
     fn = user_globals["solution"]
     
@@ -229,13 +247,13 @@ def run_ds_judge(user_code, problem_id, validation_code):
         return json.dumps({
             "success": True,
             **validation_output
-        })
+        }, default=ds_json_default)
     except Exception as e:
         return json.dumps({
             "success": False,
             "error_type": "AssertionError",
             "error": traceback.format_exc()
-        })
+        }, default=ds_json_default)
 `;
 
 let isDSReady = false;

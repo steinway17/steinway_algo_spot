@@ -133,7 +133,7 @@ tests = []
 
 # 1. Check max fare is clipped to expected_upper
 actual_max = float(result_df['Fare'].max())
-test1_passed = abs(actual_max - expected_upper) < 1e-4
+test1_passed = bool(abs(actual_max - expected_upper) < 1e-4)
 tests.append({
     "test": "상한선 클리핑 정확도",
     "passed": test1_passed,
@@ -142,7 +142,7 @@ tests.append({
 
 # 2. Check no values exceed upper or lower
 outliers_count = int(((result_df['Fare'] > expected_upper + 1e-5) | (result_df['Fare'] < expected_lower - 1e-5)).sum())
-test2_passed = (outliers_count == 0)
+test2_passed = bool(outliers_count == 0)
 tests.append({
     "test": "이상치 잔존 여부 0건 검증",
     "passed": test2_passed,
@@ -150,14 +150,14 @@ tests.append({
 })
 
 # 3. Shape and Age column preservation
-intact = result_df['Age'].equals(sample_df['Age']) and result_df.shape == sample_df.shape
+intact = bool(result_df['Age'].equals(sample_df['Age']) and result_df.shape == sample_df.shape)
 tests.append({
     "test": "기타 컬럼 무결성 보존",
     "passed": intact,
     "detail": f"타 컬럼 변조 없음: {intact}"
 })
 
-all_passed = all(t['passed'] for t in tests)
+all_passed = bool(all(bool(t['passed']) for t in tests))
 
 return {
     "all_passed": all_passed,

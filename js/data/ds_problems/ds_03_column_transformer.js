@@ -139,7 +139,7 @@ tests = []
 
 # 1. Output shape check
 # num_cols (2) + Sex (2: male, female) + Embarked (3: C, Q, S) = 7 columns
-has_correct_shape = (result_df.shape[0] == 15 and result_df.shape[1] >= 6)
+has_correct_shape = bool(result_df.shape[0] == 15 and result_df.shape[1] >= 6)
 tests.append({
     "test": "변환 행렬 차원(Shape) 검증",
     "passed": has_correct_shape,
@@ -149,7 +149,7 @@ tests.append({
 # 2. StandardScaler zero mean check for Age & Fare
 age_mean = float(result_df['Age'].mean())
 fare_mean = float(result_df['Fare'].mean())
-is_standardized = abs(age_mean) < 1e-4 and abs(fare_mean) < 1e-4
+is_standardized = bool(abs(age_mean) < 1e-4 and abs(fare_mean) < 1e-4)
 tests.append({
     "test": "StandardScaler 평균 0 수렴 검증",
     "passed": is_standardized,
@@ -157,14 +157,14 @@ tests.append({
 })
 
 # 3. OneHot columns generated
-has_cat_cols = any('Sex' in col or 'male' in col for col in result_df.columns)
+has_cat_cols = bool(any('Sex' in col or 'male' in col for col in result_df.columns))
 tests.append({
     "test": "OneHot 인코딩 컬럼 생성 검증",
     "passed": has_cat_cols,
     "detail": f"생성된 컬럼 목록: {list(result_df.columns)}"
 })
 
-all_passed = all(t['passed'] for t in tests)
+all_passed = bool(all(bool(t['passed']) for t in tests))
 
 return {
     "all_passed": all_passed,
