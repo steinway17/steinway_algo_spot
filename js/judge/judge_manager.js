@@ -1,0 +1,142 @@
+/**
+ * JudgeManager: Web Worker Lifecycle & Infinite-Loop Timeout Killer
+ */
+
+class JudgeManager {
+  constructor(workerPath = "js/judge/judge_worker.js") {
+    this.workerPath = workerPath;
+    this.worker = null;
+    this.isReady = false;
+    this.statusListeners = [];
+    this.currentExecution = null;
+    this.initWorker();
+  }
+
+  onStatusChange(fn) {
+    this.statusListeners.push(fn);
+  }
+
+  notifyStatus(status, detail = "") {
+    this.statusListeners.forEach((fn) => fn(status, detail));
+  }
+
+  initWorker() {
+    if (this.worker) {
+      try {
+        this.worker.terminate();
+      } catch (e) {
+        console.warn("Failed to terminate existing worker", e);
+      }
+    }
+
+    this.isReady = false;
+    this.notifyStatus("loading", "Pyodide WebAssembly 런타임 초기화 중...");
+
+    this.worker = new Worker(this.workerPath);
+
+    this.worker.onmessage = (e) => {
+      const { id, type, payload, error } = e.data;
+
+      if (type === "INIT_SUCCESS") {
+        this.isReady = true;
+        this.notifyStatus("ready", "Pyodide 런타임 준비 완료");
+        return;
+      }
+
+      if (type === "INIT_ERROR") {
+        this.isReady = false;
+        this.notifyStatus("error", `초기화 실패: ${error}`);
+        return;
+      }
+
+      if (this.currentExecution && this.currentExecution.id === id) {
+        clearTimeout(this.currentExecution.timer);
+        const { resolve } = this.currentExecution;
+        this.currentExecution = null;
+
+        if (type === "EXECUTE_SUCCESS") {
+          resolve({
+            ok: true,
+            data: payload
+          });
+        } else {
+          resolve({
+            ok: false,
+            error: error || "실행 중 에러가 발생했습니다."
+          });
+        }
+      }
+    };
+
+    this.worker.onerror = (err) => {
+      console.error("Worker error:", err);
+      if (this.currentExecution) {
+        clearTimeout(this.currentExecution.timer);
+        this.currentExecution.resolve({
+          ok: false,
+          error: `Worker 에러: ${err.message || String(err)}`
+        });
+        this.currentExecution = null;
+      }
+      this.notifyStatus("error", "워커 에러 발생");
+    };
+  }
+
+  async runJudge({
+    userCode,
+    entryPoint = "solution",
+    testCases = [],
+    recordTrace = true,
+    timeoutMs = 4000
+  }) {
+    if (!this.isReady) {
+      return {
+        ok: false,
+        error: "Pyodide 런타임이 아직 로드 중입니다. 잠시만 기다려주세요."
+      };
+    }
+
+    if (this.currentExecution) {
+      return {
+        ok: false,
+        error: "이미 다른 코드가 실행 중입니다."
+      };
+    }
+
+    const execId = "exec_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
+
+    return new Promise((resolve) => {
+      // 3~4s Timeout Killer
+      const timer = setTimeout(() => {
+        if (this.currentExecution && this.currentExecution.id === execId) {
+          console.warn(`Execution timed out (${timeoutMs}ms). Terminating worker...`);
+          this.initWorker(); // Kill and restart worker
+          this.currentExecution = null;
+          resolve({
+            ok: false,
+            errorType: "TLE",
+            error: `시간 초과 (Time Limit Exceeded - ${(timeoutMs / 1000).toFixed(1)}초): 무한 루프 또는 비효율적인 시간복잡도가 감지되었습니다.`
+          });
+        }
+      }, timeoutMs);
+
+      this.currentExecution = {
+        id: execId,
+        timer,
+        resolve
+      };
+
+      this.worker.postMessage({
+        id: execId,
+        type: "EXECUTE",
+        userCode,
+        entryPoint,
+        testCases,
+        recordTrace
+      });
+    });
+  }
+}
+
+// Export singleton or factory
+window.JudgeManager = JudgeManager;

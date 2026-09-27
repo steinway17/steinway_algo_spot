@@ -1,0 +1,7 @@
+.DS_Store
+*.swp
+*~
+__pycache__/
+*.pyc
+Scan_*.pdf
+bipartite_*.py

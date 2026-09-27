@@ -1,0 +1,1708 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>이분 매칭 & 증가 경로 완벽 시각화 | Bipartite Matching & Augmenting Path Visualizer</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+            },
+            matched: '#f97316',
+            augment: '#0ea5e9',
+          },
+          fontFamily: {
+            sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts & Pretendard -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- KaTeX for math formula rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body);"></script>
+
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    /* Custom Animations & Glows */
+    @keyframes pulse-glow {
+      0%, 100% { filter: drop-shadow(0 0 4px rgba(14, 165, 233, 0.8)); }
+      50% { filter: drop-shadow(0 0 14px rgba(14, 165, 233, 1)); }
+    }
+    @keyframes dash-flow {
+      to { stroke-dashoffset: -24; }
+    }
+    @keyframes ripple-pulse {
+      0% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.25); opacity: 0.3; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+    .anim-dash {
+      stroke-dasharray: 6 6;
+      animation: dash-flow 0.8s linear infinite;
+    }
+    .anim-pulse {
+      animation: pulse-glow 1.5s ease-in-out infinite;
+    }
+    .anim-ripple {
+      animation: ripple-pulse 1.6s ease-out infinite;
+    }
+
+    /* Smooth Transitions */
+    .edge-line {
+      transition: stroke 0.3s ease, stroke-width 0.3s ease, opacity 0.3s ease;
+    }
+    .node-circle {
+      cursor: pointer;
+    }
+    .node-circle circle.main-circle {
+      transition: r 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), stroke-width 0.2s ease, filter 0.2s ease;
+    }
+    .node-circle:hover circle.main-circle {
+      r: 20px;
+      filter: drop-shadow(0 0 8px rgba(14, 165, 233, 0.75));
+    }
+    .node-circle text {
+      pointer-events: none;
+      user-select: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col font-sans transition-colors duration-300">
+
+  <!-- TOP HEADER -->
+  <header class="bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20">
+          <i data-lucide="git-merge" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+              이분 매칭 & 증가 경로 알고리즘
+            </h1>
+            <span class="text-xs bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 font-semibold px-2 py-0.5 rounded-full border border-sky-200 dark:border-sky-800 hidden sm:inline-block">
+              교재 4-9장 완전 정복
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Bipartite Matching & Augmenting Path Step-by-Step Master</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs & Actions -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <a href="index.html" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+          <span>훈련소 메인</span>
+        </a>
+        <nav class="hidden lg:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-medium">
+          <button onclick="switchMainTab('bfshub')" id="btn-tab-bfshub" class="px-3 py-1.5 rounded-lg transition-all bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 shadow-sm font-bold flex items-center gap-1.5">
+            <i data-lucide="search-check" class="w-3.5 h-3.5 text-sky-500"></i>
+            <span>🔍 증가 경로 탐색(BFS) 집중 해설</span>
+          </button>
+          <button onclick="switchMainTab('story')" id="btn-tab-story" class="px-3 py-1.5 rounded-lg transition-all text-slate-600 dark:text-slate-300 hover:text-sky-600 font-semibold">
+            📖 교재 스텝별 (01~17)
+          </button>
+          <button onclick="switchMainTab('domino')" id="btn-tab-domino" class="px-3 py-1.5 rounded-lg transition-all text-slate-600 dark:text-slate-300 hover:text-sky-600">
+            💡 도미노 양보 직관
+          </button>
+          <button onclick="switchMainTab('sandbox')" id="btn-tab-sandbox" class="px-3 py-1.5 rounded-lg transition-all text-slate-600 dark:text-slate-300 hover:text-sky-600">
+            🎮 자유 실험실
+          </button>
+          <button onclick="switchMainTab('quiz')" id="btn-tab-quiz" class="px-3 py-1.5 rounded-lg transition-all text-slate-600 dark:text-slate-300 hover:text-sky-600">
+            🧠 이해도 퀴즈
+          </button>
+        </nav>
+
+        <!-- Dark Mode Toggle -->
+        <button onclick="toggleDarkMode()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+          <i data-lucide="moon" class="w-4 h-4 hidden dark:block"></i>
+          <i data-lucide="sun" class="w-4 h-4 block dark:hidden"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Tabs -->
+    <div class="flex lg:hidden border-t border-slate-200 dark:border-slate-800 overflow-x-auto text-xs font-medium px-2 py-1 gap-1">
+      <button onclick="switchMainTab('bfshub')" id="mob-tab-bfshub" class="px-3 py-1 rounded bg-sky-50 dark:bg-sky-950 text-sky-600 font-bold whitespace-nowrap">🔍 증가경로 탐색(BFS)</button>
+      <button onclick="switchMainTab('story')" id="mob-tab-story" class="px-3 py-1 text-slate-600 dark:text-slate-300 whitespace-nowrap">📖 교재 01~17</button>
+      <button onclick="switchMainTab('domino')" id="mob-tab-domino" class="px-3 py-1 text-slate-600 dark:text-slate-300 whitespace-nowrap">💡 도미노 직관</button>
+      <button onclick="switchMainTab('sandbox')" id="mob-tab-sandbox" class="px-3 py-1 text-slate-600 dark:text-slate-300 whitespace-nowrap">🎮 자유 실험</button>
+      <button onclick="switchMainTab('quiz')" id="mob-tab-quiz" class="px-3 py-1 text-slate-600 dark:text-slate-300 whitespace-nowrap">🧠 퀴즈</button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- ==========================================
+         LEFT: INTERACTIVE GRAPH CANVAS (7 Cols)
+         ========================================== -->
+    <section class="lg:col-span-7 flex flex-col gap-4">
+      <div class="bg-white dark:bg-slate-800/90 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700/80 p-5 flex flex-col flex-1 relative overflow-hidden">
+        
+        <!-- Canvas Header & Quick Controls -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-700/60">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-slate-400 tracking-wider uppercase">이분 그래프 시각화</span>
+            <div class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700">
+              <span>현재 매칭 크기:</span>
+              <span id="canvas-matching-size" class="text-orange-500 font-bold text-sm">3</span>
+              <span class="text-slate-400">/ 5</span>
+            </div>
+            <div id="badge-max-matching" class="hidden text-xs bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
+              🎉 최대 매칭 달성!
+            </div>
+          </div>
+
+          <!-- Quick Presets -->
+          <div class="flex items-center gap-1">
+            <button onclick="loadPreset('initial')" title="교재 초기 매칭 (크기 3)" class="text-xs px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 transition font-medium">
+              초기 상태 (3)
+            </button>
+            <button onclick="loadPreset('augmented')" title="증가 경로 적용 후 (크기 4)" class="text-xs px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 transition font-medium">
+              최대 매칭 (4)
+            </button>
+            <button onclick="loadPreset('empty')" title="모든 매칭 해제" class="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 transition font-medium text-slate-500">
+              초기화
+            </button>
+          </div>
+        </div>
+
+        <!-- Legend (범례) -->
+        <div class="flex flex-wrap items-center gap-4 py-2 text-xs text-slate-500 dark:text-slate-400">
+          <div class="flex items-center gap-1.5">
+            <span class="w-3.5 h-1 bg-orange-500 rounded-full inline-block"></span>
+            <span class="font-medium text-orange-600 dark:text-orange-400">매칭 간선 (Matched)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3.5 h-1 bg-sky-400 rounded-full inline-block border-b border-dashed border-sky-500"></span>
+            <span class="font-medium text-sky-600 dark:text-sky-400">증가 경로 (Augmenting)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3.5 h-1 bg-slate-300 dark:bg-slate-600 rounded-full inline-block"></span>
+            <span>미매칭 간선</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full border-2 border-orange-500 bg-orange-100 inline-block"></span>
+            <span>매칭 정점</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full border-2 border-slate-400 bg-white inline-block"></span>
+            <span>미매칭(Free) 정점</span>
+          </div>
+        </div>
+
+        <!-- SVG Graph Container -->
+        <div class="relative flex-1 min-h-[440px] flex items-center justify-center bg-slate-50/70 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 p-2 overflow-hidden select-none">
+          
+          <!-- Column Labels -->
+          <div class="absolute top-3 left-16 text-xs font-bold text-slate-400 dark:text-slate-500 tracking-wider flex items-center gap-1">
+            <i data-lucide="user" class="w-3.5 h-3.5"></i> 왼쪽 그룹 (사람 1~5)
+          </div>
+          <div class="absolute top-3 right-16 text-xs font-bold text-slate-400 dark:text-slate-500 tracking-wider flex items-center gap-1">
+            <i data-lucide="briefcase" class="w-3.5 h-3.5"></i> 오른쪽 그룹 (작업 A~F)
+          </div>
+
+          <!-- Dynamic SVG Canvas -->
+          <svg id="graph-svg" class="w-full h-full min-h-[420px]" viewBox="0 0 540 420">
+            <defs>
+              <filter id="glow-orange" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#f97316" flood-opacity="0.8"/>
+              </filter>
+              <filter id="glow-sky" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#0ea5e9" flood-opacity="0.9"/>
+              </filter>
+              <filter id="glow-node" x="-30%" y="-30%" width="160%" height="160%">
+                <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#38bdf8" flood-opacity="0.6"/>
+              </filter>
+            </defs>
+
+            <!-- Group for Edges -->
+            <g id="edges-layer"></g>
+
+            <!-- Group for Nodes -->
+            <g id="nodes-layer"></g>
+          </svg>
+
+          <!-- Floating Interactive Guide / Toast -->
+          <div id="canvas-hint" class="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/85 text-white text-xs px-3.5 py-1.5 rounded-full backdrop-blur pointer-events-none shadow-lg transition-opacity duration-300 flex items-center gap-1.5 opacity-90">
+            <i data-lucide="mouse-pointer-click" class="w-3.5 h-3.5 text-sky-400"></i>
+            <span>왼쪽 미매칭 정점(3번, 5번)을 클릭하면 증가 경로를 탐색합니다.</span>
+          </div>
+        </div>
+
+        <!-- Path Inversion Action Bar -->
+        <div id="augment-action-bar" class="mt-3 p-3.5 bg-gradient-to-r from-sky-50 via-indigo-50 to-orange-50 dark:from-sky-950/50 dark:via-indigo-950/50 dark:to-orange-950/50 border border-sky-200 dark:border-sky-800 rounded-xl flex items-center justify-between transition-all">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-sky-500 text-white flex items-center justify-center font-bold shadow-sm">
+              <i data-lucide="repeat" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <span>증가 경로 발견!</span>
+                <span id="current-path-text" class="font-mono text-sky-600 dark:text-sky-400 bg-white dark:bg-slate-800 px-2 py-0.5 rounded border text-[11px]">
+                  3 → B → 1 → D → 4 → F
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                미매칭 간선과 매칭 간선의 상태를 반전하여 전체 매칭 크기를 무조건 +1 늘립니다!
+              </p>
+            </div>
+          </div>
+
+          <button id="btn-execute-flip" onclick="executeFlipAugment()" class="px-3.5 py-2 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-bold text-xs rounded-lg shadow-md shadow-sky-500/25 flex items-center gap-1.5 transition active:scale-95 whitespace-nowrap">
+            <i data-lucide="zap" class="w-4 h-4"></i>
+            <span>상태 반전 (크기 +1)</span>
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==========================================
+         RIGHT: INTERACTIVE EXPLANATION PANELS (5 Cols)
+         ========================================== -->
+    <section class="lg:col-span-5 flex flex-col gap-4">
+      
+      <!-- =======================================================
+           PANEL 1: 🔍 증가 경로 탐색(BFS) 집중 해설 (NEW / HIGHLIGHT)
+           ======================================================= -->
+      <div id="panel-bfshub" class="flex flex-col gap-4">
+        
+        <!-- Core Rule Card (교대 규칙 핵심 원리) -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-sky-200 dark:border-sky-800/80 p-5 bg-gradient-to-br from-white via-sky-50/30 to-white dark:from-slate-800 dark:via-slate-800 dark:to-slate-800">
+          
+          <div class="flex items-center gap-2.5 mb-3">
+            <div class="w-8 h-8 rounded-lg bg-sky-500 text-white flex items-center justify-center font-bold">
+              <i data-lucide="compass" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h2 class="text-sm font-bold text-slate-900 dark:text-white">
+                증가 경로 탐색의 황금 규칙: "교대 이동(Alternation)"
+              </h2>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400">컴퓨터는 왜 이런 규칙으로 길을 찾을까요?</p>
+            </div>
+          </div>
+
+          <!-- The 3 Core Rules -->
+          <div class="space-y-2 text-xs font-sans">
+            <div class="p-2.5 rounded-xl bg-sky-50 dark:bg-sky-950/60 border border-sky-100 dark:border-sky-800/60 flex items-start gap-2">
+              <span class="px-1.5 py-0.5 rounded bg-sky-500 text-white font-bold text-[10px] shrink-0 mt-0.5">규칙 1</span>
+              <div>
+                <strong class="text-sky-900 dark:text-sky-200">왼쪽(사람) → 오른쪽(작업): "미매칭 간선"만 탄다</strong>
+                <p class="text-slate-600 dark:text-slate-300 text-[11px] mt-0.5">
+                  사람은 아직 자기가 맡지 않은 새로운 일자리를 찔러봐야 하므로 미매칭 간선으로 대시합니다.
+                </p>
+              </div>
+            </div>
+
+            <div class="p-2.5 rounded-xl bg-orange-50 dark:bg-orange-950/60 border border-orange-100 dark:border-orange-800/60 flex items-start gap-2">
+              <span class="px-1.5 py-0.5 rounded bg-orange-500 text-white font-bold text-[10px] shrink-0 mt-0.5">규칙 2</span>
+              <div>
+                <strong class="text-orange-900 dark:text-orange-200">오른쪽(작업) → 왼쪽(사람): "매칭 간선"만 탄다</strong>
+                <p class="text-slate-600 dark:text-slate-300 text-[11px] mt-0.5">
+                  도착한 작업이 이미 누군가의 것이라면, 그 <strong>원래 주인</strong>에게 가서 "너 다른 일로 양보해줘"라고 부탁해야 하므로 매칭 간선을 타고 주인에게 갑니다.
+                </p>
+              </div>
+            </div>
+
+            <div class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800/60 flex items-start gap-2">
+              <span class="px-1.5 py-0.5 rounded bg-emerald-500 text-white font-bold text-[10px] shrink-0 mt-0.5">종료 조건</span>
+              <div>
+                <strong class="text-emerald-900 dark:text-emerald-200">오른쪽에서 "빈 작업(Free)"을 만나는 순간!</strong>
+                <p class="text-slate-600 dark:text-slate-300 text-[11px] mt-0.5">
+                  아무도 안 맡고 있는 빈 일자리를 발견하면 도미노 양보 연쇄가 완성되어 즉시 탐색이 성공하고 종료됩니다!
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Walkthrough Controller (교재 10~14단계 & 15~17단계 전용) -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700/80 p-5 flex flex-col gap-3">
+          
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-700">
+            <span class="text-xs font-bold text-slate-700 dark:text-slate-200">
+              🎬 교재 탐색 시나리오 선택
+            </span>
+            <div class="flex items-center gap-1">
+              <button onclick="setBfsScenario('success')" id="btn-scen-succ" class="text-xs px-2.5 py-1 rounded-lg font-bold bg-sky-500 text-white shadow-sm transition">
+                5번 출발 탐색 (성공: 10~14단계)
+              </button>
+              <button onclick="setBfsScenario('fail')" id="btn-scen-fail" class="text-xs px-2.5 py-1 rounded-lg font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition">
+                최대 매칭 검증 (실패: 15~17단계)
+              </button>
+            </div>
+          </div>
+
+          <!-- Step Controller for BFS -->
+          <div class="flex items-center justify-between bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+            <div class="flex items-center gap-2">
+              <span id="bfs-substep-badge" class="px-2 py-0.5 rounded text-[11px] font-bold bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                Stage 1 / 5
+              </span>
+              <span id="bfs-substep-title" class="text-xs font-bold text-slate-800 dark:text-slate-100">
+                정점 5번(미매칭) 선택
+              </span>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <button onclick="prevBfsSubStep()" class="p-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 transition">
+                <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="nextBfsSubStep()" class="px-2.5 py-1 rounded bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs flex items-center gap-1 shadow-sm transition">
+                <span>다음 단계</span>
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Dynamic BFS Substep Content -->
+          <div id="bfs-substep-desc" class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-900/40 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+            <!-- Loaded by JS -->
+          </div>
+
+          <!-- Status Breadcrumb Table (Queue, Visited, Parent) -->
+          <div class="p-3 bg-slate-50 dark:bg-slate-900/70 rounded-xl border border-slate-100 dark:border-slate-800 text-[11px] space-y-1.5 font-mono">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400 font-sans font-semibold">탐색 큐(Queue):</span>
+              <span id="bfs-table-queue" class="text-sky-600 dark:text-sky-400 font-bold">[ 5 ]</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400 font-sans font-semibold">방문한 정점(Visited):</span>
+              <span id="bfs-table-visited" class="text-slate-700 dark:text-slate-300">{ 5 }</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400 font-sans font-semibold">발견된 증가 경로:</span>
+              <span id="bfs-table-result" class="text-orange-500 font-bold">탐색 진행 중...</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- =======================================================
+           PANEL 2: 📖 교재 스텝별 해설 (01 ~ 17)
+           ======================================================= -->
+      <div id="panel-story" class="hidden flex flex-col gap-4">
+        
+        <!-- Step Navigation Bar -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700/80 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span id="step-badge" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                Step 01 / 17
+              </span>
+              <span id="step-phase-tag" class="text-xs font-semibold text-slate-500">이분 그래프의 이해</span>
+            </div>
+
+            <!-- Auto-play & Step Buttons -->
+            <div class="flex items-center gap-1">
+              <button onclick="prevStep()" class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition">
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+              </button>
+              <button id="btn-autoplay" onclick="toggleAutoplay()" class="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium flex items-center gap-1 text-slate-700 dark:text-slate-200 transition">
+                <i data-lucide="play" class="w-3.5 h-3.5 text-sky-500"></i>
+                <span id="autoplay-text">자동재생</span>
+              </button>
+              <button onclick="nextStep()" class="p-1.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white transition shadow-sm">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Step Progress Slider -->
+          <input type="range" id="step-slider" min="1" max="17" value="1" oninput="goToStep(parseInt(this.value))" class="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500" />
+          
+          <div class="flex justify-between text-[10px] text-slate-400 mt-1 font-mono">
+            <span>01 기초</span>
+            <span>07 증가경로</span>
+            <span>10 BFS탐색</span>
+            <span>15 최대증명</span>
+            <span>17 완료</span>
+          </div>
+        </div>
+
+        <!-- Step Detailed Explanation Card -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700/80 p-5 flex flex-col gap-4 flex-1">
+          
+          <!-- Step Title & Icon -->
+          <div class="flex items-start gap-3">
+            <div id="step-icon-box" class="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0 mt-0.5">
+              <i id="step-icon" data-lucide="users" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h2 id="step-title" class="text-base font-bold text-slate-900 dark:text-white leading-tight">
+                01. 이분 그래프와 작업 할당
+              </h2>
+              <p id="step-subtitle" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                왼쪽 정점(사람)과 오른쪽 정점(작업)을 연결하는 기본 구조
+              </p>
+            </div>
+          </div>
+
+          <!-- Main Content Body -->
+          <div id="step-description" class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800/80">
+            <!-- Dynamic Description Loaded Here -->
+          </div>
+
+          <!-- One-Point Lesson Box (원포인트 레슨) -->
+          <div id="step-onepoint" class="p-4 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 text-xs font-bold mt-0.5">
+              💡
+            </div>
+            <div>
+              <div class="text-xs font-bold text-amber-900 dark:text-amber-200 mb-0.5">
+                원포인트 핵심 체크
+              </div>
+              <p id="step-onepoint-text" class="text-xs text-amber-800 dark:text-amber-300/90 leading-normal">
+                정점이 왼쪽과 오른쪽으로 나뉘어 있어 모든 간선이 서로 다른 그룹을 연결하는 그래프를 이분 그래프라고 합니다.
+              </p>
+            </div>
+          </div>
+
+          <!-- Interactive Action Helper Button -->
+          <div id="step-action-container" class="pt-1">
+            <!-- Dynamic Button depending on step -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- =======================================================
+           PANEL 3: 💡 도미노 양보 직관
+           ======================================================= -->
+      <div id="panel-domino" class="hidden flex flex-col gap-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700/80 p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+            </div>
+            <h3 class="font-bold text-slate-900 dark:text-white text-sm">매칭 알고리즘의 본질: "도미노 양보 연쇄"</h3>
+          </div>
+          
+          <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
+            새로운 사람에게 일자리를 주려면, 기존에 일자리를 차지하고 있던 사람들에게 <strong>"너 다른 일 할 수 있어?"</strong>라고 연쇄적으로 물어보며 빈자리를 만들어내야 합니다.
+          </p>
+
+          <!-- Interactive Story Dialogue Card -->
+          <div class="space-y-2.5 text-xs font-sans">
+            <div class="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-xl border border-sky-100 dark:border-sky-800 flex items-start gap-2.5">
+              <span class="px-2 py-0.5 bg-sky-500 text-white rounded font-bold text-[10px]">1단계</span>
+              <div>
+                <strong class="text-sky-900 dark:text-sky-200">3번 (실직자):</strong>
+                <p class="text-slate-600 dark:text-slate-300 mt-0.5">"나 <strong>작업 B</strong> 하고 싶어!"</p>
+              </div>
+            </div>
+
+            <div class="p-3 bg-orange-50 dark:bg-orange-950/40 rounded-xl border border-orange-100 dark:border-orange-800 flex items-start gap-2.5">
+              <span class="px-2 py-0.5 bg-orange-500 text-white rounded font-bold text-[10px]">2단계</span>
+              <div>
+                <strong class="text-orange-900 dark:text-orange-200">작업 B & 1번:</strong>
+                <p class="text-slate-600 dark:text-slate-300 mt-0.5">작업 B는 이미 <strong>1번</strong>이 하고 있음! 1번에게 물어봄: <em>"1번아, 너 다른 작업 갈 수 있어?"</em></p>
+              </div>
+            </div>
+
+            <div class="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-xl border border-sky-100 dark:border-sky-800 flex items-start gap-2.5">
+              <span class="px-2 py-0.5 bg-sky-500 text-white rounded font-bold text-[10px]">3단계</span>
+              <div>
+                <strong class="text-sky-900 dark:text-sky-200">1번:</strong>
+                <p class="text-slate-600 dark:text-slate-300 mt-0.5">"나 <strong>작업 D</strong>도 할 수 있어! D로 양보해서 옮길게!"</p>
+              </div>
+            </div>
+
+            <div class="p-3 bg-orange-50 dark:bg-orange-950/40 rounded-xl border border-orange-100 dark:border-orange-800 flex items-start gap-2.5">
+              <span class="px-2 py-0.5 bg-orange-500 text-white rounded font-bold text-[10px]">4단계</span>
+              <div>
+                <strong class="text-orange-900 dark:text-orange-200">작업 D & 4번:</strong>
+                <p class="text-slate-600 dark:text-slate-300 mt-0.5">작업 D는 <strong>4번</strong>이 하고 있었음! 4번에게 물어봄: <em>"4번아, 너 또 다른 작업 돼?"</em></p>
+              </div>
+            </div>
+
+            <div class="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-100 dark:border-emerald-800 flex items-start gap-2.5">
+              <span class="px-2 py-0.5 bg-emerald-500 text-white rounded font-bold text-[10px]">5단계 (성공!)</span>
+              <div>
+                <strong class="text-emerald-900 dark:text-emerald-200">4번 & 작업 F:</strong>
+                <p class="text-slate-600 dark:text-slate-300 mt-0.5">4번: "난 <strong>작업 F</strong>로 갈게!" → 작업 F는 <strong>아무도 안 하던 빈자리(Free)</strong>! 도미노 연쇄 완성!</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex justify-end">
+            <button onclick="goToStep(7); switchMainTab('story');" class="text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow transition">
+              그래프에서 직접 확인하기 →
+            </button>
+          </div>
+        </div>
+
+        <!-- Math Principle Card -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700/80 p-5">
+          <h4 class="font-bold text-xs text-slate-400 uppercase tracking-wider mb-2">수학적 원리: 왜 크기가 +1 될까?</h4>
+          <div class="text-xs text-slate-700 dark:text-slate-300 space-y-2">
+            <p>
+              증가 경로는 <strong>[미매칭 정점]</strong>에서 시작해 <strong>[미매칭 정점]</strong>에서 끝납니다.
+            </p>
+            <div class="bg-slate-100 dark:bg-slate-900 p-2.5 rounded-lg font-mono text-[11px] text-center text-slate-800 dark:text-slate-200">
+              미매칭 간선 ($k+1$개) - 매칭 간선 ($k$개) = +1개
+            </div>
+            <p>
+              이 경로 위의 간선 상태를 <strong>반전(Flip / Toggle)</strong>하면:
+            </p>
+            <ul class="list-disc pl-4 space-y-1 text-slate-600 dark:text-slate-400">
+              <li>중간 정점들은 새 짝 1개씩과만 연결되므로 <strong>1:1 매칭 조건이 완벽히 유지</strong>됩니다.</li>
+              <li>양 끝의 미매칭 정점 2개도 마침내 짝을 얻게 됩니다.</li>
+              <li>따라서 전체 매칭의 크기는 <strong>무조건 정확히 +1 증가</strong>합니다!</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- =======================================================
+           PANEL 4: 🎮 자유 실험실 (Sandbox)
+           ======================================================= -->
+      <div id="panel-sandbox" class="hidden flex flex-col gap-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700/80 p-5">
+          <h3 class="font-bold text-slate-900 dark:text-white text-sm mb-2">🎮 자유 실험실 모드</h3>
+          <p class="text-xs text-slate-600 dark:text-slate-300 mb-4">
+            마우스로 그래프의 간선들을 자유롭게 클릭하여 매칭을 만들어보세요. 잘못된 매칭(충돌)이나 알고리즘의 단계별 동작을 실시간으로 시험해볼 수 있습니다.
+          </p>
+
+          <div class="space-y-3">
+            <button onclick="runBfsAugmentStepByStep()" class="w-full py-2.5 px-3 bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-2">
+              <i data-lucide="search" class="w-4 h-4"></i>
+              <span>알고리즘으로 증가 경로 자동 탐색</span>
+            </button>
+
+            <button onclick="autoSolveMaximumMatching()" class="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-2">
+              <i data-lucide="check-check" class="w-4 h-4"></i>
+              <span>최대 매칭 끝까지 자동 완성</span>
+            </button>
+
+            <button onclick="loadPreset('empty')" class="w-full py-2 px-3 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 font-medium text-xs rounded-xl transition flex items-center justify-center gap-2">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+              <span>모든 간선 매칭 초기화</span>
+            </button>
+          </div>
+
+          <div class="mt-4 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl text-xs text-slate-500 dark:text-slate-400">
+            <span class="font-bold text-slate-700 dark:text-slate-200 block mb-1">💡 팁:</span>
+            매칭 충돌이 발생하면 간선이 붉은색으로 깜빡이며 매칭 규칙 위반을 알려줍니다.
+          </div>
+        </div>
+      </div>
+
+      <!-- =======================================================
+           PANEL 5: 🧠 이해도 퀴즈 (Quiz)
+           ======================================================= -->
+      <div id="panel-quiz" class="hidden flex flex-col gap-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700/80 p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-slate-900 dark:text-white text-sm">🧠 개념 완성 자가진단 퀴즈</h3>
+            <span id="quiz-score" class="text-xs font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950 px-2 py-0.5 rounded">
+              0 / 3 정답
+            </span>
+          </div>
+
+          <div id="quiz-container" class="space-y-4">
+            <!-- Quiz Item 1 -->
+            <div class="p-3.5 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+              <p class="font-bold text-slate-800 dark:text-slate-200 mb-2">
+                Q1. '증가 경로(Augmenting Path)'의 양 끝 정점은 어떤 상태여야 할까요?
+              </p>
+              <div class="space-y-1.5">
+                <button onclick="checkQuiz(1, 0)" class="quiz-btn w-full text-left p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition">
+                  A. 둘 다 이미 매칭되어 있는 정점이어야 한다.
+                </button>
+                <button onclick="checkQuiz(1, 1)" class="quiz-btn w-full text-left p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition" data-correct="true">
+                  B. 둘 다 아직 매칭되지 않은(Free) 정점이어야 한다.
+                </button>
+                <button onclick="checkQuiz(1, 2)" class="quiz-btn w-full text-left p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition">
+                  C. 하나는 매칭되고 다른 하나는 매칭되지 않아야 한다.
+                </button>
+              </div>
+              <div id="quiz-feedback-1" class="hidden mt-2 p-2 rounded text-[11px] font-medium"></div>
+            </div>
+
+            <!-- Quiz Item 2 -->
+            <div class="p-3.5 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+              <p class="font-bold text-slate-800 dark:text-slate-200 mb-2">
+                Q2. 증가 경로에서 '미매칭 간선 수'와 '매칭 간선 수'의 관계는?
+              </p>
+              <div class="space-y-1.5">
+                <button onclick="checkQuiz(2, 0)" class="quiz-btn w-full text-left p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition">
+                  A. 두 간선의 개수가 정확히 같다.
+                </button>
+                <button onclick="checkQuiz(2, 1)" class="quiz-btn w-full text-left p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition" data-correct="true">
+                  B. 미매칭 간선이 매칭 간선보다 항상 1개 더 많다.
+                </button>
+                <button onclick="checkQuiz(2, 2)" class="quiz-btn w-full text-left p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition">
+                  C. 매칭 간선이 미매칭 간선보다 항상 1개 더 많다.
+                </button>
+              </div>
+              <div id="quiz-feedback-2" class="hidden mt-2 p-2 rounded text-[11px] font-medium"></div>
+            </div>
+
+            <!-- Quiz Item 3 -->
+            <div class="p-3.5 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+              <p class="font-bold text-slate-800 dark:text-slate-200 mb-2">
+                Q3. 그래프에서 더 이상 증가 경로를 찾을 수 없다면 무엇을 의미할까요? (Berge's Lemma)
+              </p>
+              <div class="space-y-1.5">
+                <button onclick="checkQuiz(3, 0)" class="quiz-btn w-full text-left p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition">
+                  A. 알고리즘에 오류가 발생했음을 의미한다.
+                </button>
+                <button onclick="checkQuiz(3, 1)" class="quiz-btn w-full text-left p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition" data-correct="true">
+                  B. 현재 매칭이 가능한 가장 큰 '최대 매칭(Maximum Matching)'임이 수학적으로 보장된다.
+                </button>
+                <button onclick="checkQuiz(3, 2)" class="quiz-btn w-full text-left p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition">
+                  C. 모든 정점이 100% 매칭되었다는 뜻이다.
+                </button>
+              </div>
+              <div id="quiz-feedback-3" class="hidden mt-2 p-2 rounded text-[11px] font-medium"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- BOTTOM FOOTER -->
+  <footer class="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-4 px-6 text-center text-xs text-slate-400">
+    <p>알고리즘 제4-9장 매칭 알고리즘 인터랙티브 스터디 킷 &bull; 제작: Antigravity Pair Programmer</p>
+  </footer>
+
+  <!-- ==========================================
+       CORE JAVASCRIPT ENGINE & DATA
+       ========================================== -->
+  <script>
+    // --- GRAPH DATA STRUCTURE & INITIAL STATE ---
+    const leftNodes = ['1', '2', '3', '4', '5'];
+    const rightNodes = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+    // Node Positions on SVG (viewBox 0 0 540 420)
+    const nodeCoords = {
+      '1': { x: 100, y: 60 },
+      '2': { x: 100, y: 130 },
+      '3': { x: 100, y: 200 },
+      '4': { x: 100, y: 270 },
+      '5': { x: 100, y: 340 },
+      'A': { x: 440, y: 40 },
+      'B': { x: 440, y: 100 },
+      'C': { x: 440, y: 160 },
+      'D': { x: 440, y: 220 },
+      'E': { x: 440, y: 280 },
+      'F': { x: 440, y: 340 },
+    };
+
+    // All Edges defined in PDF
+    const allEdges = [
+      { u: '1', v: 'B' },
+      { u: '1', v: 'D' },
+      { u: '2', v: 'A' },
+      { u: '2', v: 'C' },
+      { u: '2', v: 'E' },
+      { u: '3', v: 'B' },
+      { u: '3', v: 'D' },
+      { u: '4', v: 'B' },
+      { u: '4', v: 'D' },
+      { u: '4', v: 'E' },
+      { u: '4', v: 'F' },
+      { u: '5', v: 'B' },
+      { u: '5', v: 'D' },
+    ];
+
+    // Current State
+    let currentMatchedEdges = new Set(['1-B', '2-E', '4-D']); // default matching M1 (size 3)
+    let currentAugmentingPath = [];
+    let highlightedNodes = new Set();
+    let visitedNodesInBfs = new Set();
+    let currentStep = 1;
+    let autoplayInterval = null;
+    let quizScore = 0;
+    let answeredQuestions = new Set();
+
+    // BFS Interactive Substep Engine
+    let currentBfsScenario = 'success'; // 'success' (10~14) or 'fail' (15~17)
+    let currentBfsSubstep = 1;
+
+    const bfsSuccessStages = [
+      {
+        stage: 1,
+        title: "Stage 1: 출발 정점(루트) 선택",
+        desc: `현재 매칭되지 않은 왼쪽 정점 중 <strong>정점 5(Free)</strong>를 시작점으로 선택합니다.<br/>
+               탐색 큐(Queue)에 <code>5</code>를 넣고 방문 처리합니다.`,
+        matching: ['1-B', '2-E', '4-D'],
+        path: [],
+        highlight: ['5'],
+        visited: ['5'],
+        queue: '[ 5 ]',
+        res: '탐색 시작 (정점 5)',
+      },
+      {
+        stage: 2,
+        title: "Stage 2: 미매칭 간선 타고 오른쪽으로 대시!",
+        desc: `정점 5에서 갈 수 있는 오른쪽 정점은 <strong>B와 D</strong>입니다.<br/>
+               <code>(5, B)</code>와 <code>(5, D)</code> 미매칭 간선을 타고 B와 D를 마크합니다.<br/>
+               <strong>확인:</strong> B와 D는 비어있나요? <strong>아닙니다!</strong> B는 1번과, D는 4번과 이미 매칭 중입니다.`,
+        matching: ['1-B', '2-E', '4-D'],
+        path: [],
+        highlight: ['5', 'B', 'D'],
+        visited: ['5', 'B', 'D'],
+        queue: '[ B, D ]',
+        res: 'B(1번 소유), D(4번 소유) 발견',
+      },
+      {
+        stage: 3,
+        title: "Stage 3: 매칭 간선 타고 원래 주인(왼쪽)에게 이동!",
+        desc: `B와 D의 원래 주인에게 <em>"다른 일자리로 옮겨줄 수 있어?"</em>라고 부탁하기 위해, <strong>매칭 간선</strong>을 타고 왼쪽 <strong>1번과 4번</strong>으로 이동합니다.<br/>
+               <code>(B, 1)</code>, <code>(D, 4)</code>를 타고 왼쪽 1, 4를 마크합니다.`,
+        matching: ['1-B', '2-E', '4-D'],
+        path: [],
+        highlight: ['5', 'B', 'D', '1', '4'],
+        visited: ['5', 'B', 'D', '1', '4'],
+        queue: '[ 1, 4 ]',
+        res: '양보 대상자 1번, 4번에게 도달',
+      },
+      {
+        stage: 4,
+        title: "Stage 4: 1번과 4번이 다른 일자리(미매칭) 탐색",
+        desc: `1번과 4번이 할 수 있는 다른 작업들을 <strong>미매칭 간선</strong>으로 알아봅니다.<br/>
+               • 1번 → B, D (이미 방문함)<br/>
+               • 4번 → B, D (방문함), <strong>E, F (새로 발견!)</strong><br/>
+               오른쪽 정점 <strong>E와 F</strong>를 새롭게 큐에 추가합니다!`,
+        matching: ['1-B', '2-E', '4-D'],
+        path: [],
+        highlight: ['5', 'B', 'D', '1', '4', 'E', 'F'],
+        visited: ['5', 'B', 'D', '1', '4', 'E', 'F'],
+        queue: '[ E, F ]',
+        res: '새로운 작업 E, F 발견!',
+      },
+      {
+        stage: 5,
+        title: "Stage 5: 🎉 빈 작업(F) 발견! 증가 경로 역추적 완성",
+        desc: `<strong>작업 F는 아무도 맡지 않은 빈자리(Free)입니다!</strong><br/>
+               F에 도착했으므로 즉시 탐색을 멈추고 부모 노드를 역추적(Backtrack)합니다.<br/>
+               경로: <code>5 → D → 4 → F</code> (길이 3의 증가 경로 완성!)`,
+        matching: ['1-B', '2-E', '4-D'],
+        path: ['5', 'D', '4', 'F'],
+        highlight: ['5', 'F'],
+        visited: ['5', 'B', 'D', '1', '4', 'E', 'F'],
+        queue: '[ ] (완료)',
+        res: '5 → D → 4 → F (증가 경로 확정!)',
+      }
+    ];
+
+    const bfsFailStages = [
+      {
+        stage: 1,
+        title: "Stage 1: 크기 4 매칭에서 정점 5 선택",
+        desc: `현재 매칭(크기 4: <code>1-D, 2-E, 3-B, 4-F</code>)에서 유일한 미매칭 정점인 <strong>5번</strong>에서 다시 증가 경로가 있는지 탐색합니다.`,
+        matching: ['1-D', '2-E', '3-B', '4-F'],
+        path: [],
+        highlight: ['5'],
+        visited: ['5'],
+        queue: '[ 5 ]',
+        res: '탐색 시작 (정점 5)',
+      },
+      {
+        stage: 2,
+        title: "Stage 2: 5번에서 B와 D 마크",
+        desc: `5번에서 미매칭 간선을 타고 <strong>B와 D</strong>를 방문합니다.<br/>
+               현재 B는 3번과 매칭 중, D는 1번과 매칭 중입니다.`,
+        matching: ['1-D', '2-E', '3-B', '4-F'],
+        path: [],
+        highlight: ['5', 'B', 'D'],
+        visited: ['5', 'B', 'D'],
+        queue: '[ B, D ]',
+        res: 'B(3번 소유), D(1번 소유)',
+      },
+      {
+        stage: 3,
+        title: "Stage 3: 매칭 간선 타고 3번과 1번으로 이동",
+        desc: `B와 D의 주인인 <strong>3번과 1번</strong>으로 매칭 간선을 타고 이동합니다.`,
+        matching: ['1-D', '2-E', '3-B', '4-F'],
+        path: [],
+        highlight: ['5', 'B', 'D', '3', '1'],
+        visited: ['5', 'B', 'D', '3', '1'],
+        queue: '[ 3, 1 ]',
+        res: '3번, 1번 도달',
+      },
+      {
+        stage: 4,
+        title: "Stage 4: 3번과 1번의 다른 간선 확인",
+        desc: `3번과 1번이 할 수 있는 다른 작업은 오직 <code>B, D</code>뿐인데, <strong>이미 방문한 정점들</strong>입니다.<br/>
+               더 이상 큐에 넣을 수 있는 새로운 정점이 없습니다!`,
+        matching: ['1-D', '2-E', '3-B', '4-F'],
+        path: [],
+        highlight: ['5', 'B', 'D', '3', '1'],
+        visited: ['5', 'B', 'D', '3', '1'],
+        queue: '[ ] (큐가 빔)',
+        res: '새로운 정점 없음 (탐색 막힘)',
+      },
+      {
+        stage: 5,
+        title: "Stage 5: 🛑 탐색 종료 & 최대 매칭(Maximum Matching) 확정!",
+        desc: `더 이상 갈 수 있는 길이 없으며 큐가 비었습니다.<br/>
+               <strong>증가 경로가 0개이므로, Berge의 보조정리에 의해 현재 매칭(크기 4)이 완벽한 '최대 매칭'임이 수학적으로 증명되었습니다!</strong>`,
+        matching: ['1-D', '2-E', '3-B', '4-F'],
+        path: [],
+        highlight: ['1', '2', '3', '4', 'B', 'D', 'E', 'F'],
+        visited: ['5', 'B', 'D', '3', '1'],
+        queue: '[ ] (종료)',
+        res: '🎉 최대 매칭 증명 완료 (크기 4)',
+      }
+    ];
+
+    // --- STEP DESCRIPTIONS (01 to 17) MATCHING PDF ---
+    const stepData = [
+      {
+        step: 1,
+        title: "01. 이분 그래프와 작업 할당 문제",
+        phase: "기초 개념",
+        icon: "network",
+        desc: `정점이 <strong>왼쪽(사람 1~5)</strong>과 <strong>오른쪽(작업 A~F)</strong>으로 나뉘어 있고, 모든 간선이 왼쪽과 오른쪽 정점 사이만 연결하는 그래프를 <strong>이분 그래프(Bipartite Graph)</strong>라고 합니다.<br/><br/>
+               예를 들어 정점 2는 <code>A, C, E</code> 3개의 작업에 연결되어 있으므로 "사람 2는 A, C, E 작업을 수행할 수 있다"고 해석합니다.`,
+        onepoint: "이분 그래프에서는 같은 그룹 정점끼리는 절대 간선으로 연결되지 않습니다.",
+        matching: [],
+        path: [],
+        highlightNodes: ['2', 'A', 'C', 'E'],
+      },
+      {
+        step: 2,
+        title: "02. 매칭(Matching)의 정의",
+        phase: "기초 개념",
+        icon: "check-circle-2",
+        desc: `<strong>정점을 공유하지 않는 간선들의 집합</strong>을 <strong>매칭</strong>이라고 합니다.<br/><br/>
+               여기서는 <code>(1 - B)</code>, <code>(2 - E)</code>, <code>(4 - D)</code>를 주황색 간선으로 선택했습니다. 이는 사람 1에게 작업 B를, 사람 2에게 작업 E를, 사람 4에게 작업 D를 각각 1:1로 할당한 상태입니다.`,
+        onepoint: "어떤 정점도 두 개 이상의 간선에 묶이지 않아야 유효한 매칭입니다.",
+        matching: ['1-B', '2-E', '4-D'],
+        path: [],
+        highlightNodes: ['1', 'B', '2', 'E', '4', 'D'],
+      },
+      {
+        step: 3,
+        title: "03. 매칭이 아닌 예시 (충돌 발생)",
+        phase: "기초 개념",
+        icon: "alert-triangle",
+        desc: `만약 <code>(1 - B)</code>, <code>(3 - B)</code>, <code>(4 - D)</code>, <code>(4 - E)</code>를 선택한다면 어떨까요?<br/><br/>
+               정점 <strong>B</strong>가 1번과 3번 두 사람에게 공유되고, 사람 <strong>4</strong>가 D와 E 두 작업을 동시에 맡게 되므로 <strong>매칭이 아닙니다</strong>.`,
+        onepoint: "1명의 사람에게 2개 이상의 일을 주거나, 1개의 일을 2명에게 주는 것은 금지됩니다!",
+        matching: ['1-B', '3-B', '4-D', '4-E'],
+        conflict: true,
+        path: [],
+        highlightNodes: ['B', '4'],
+      },
+      {
+        step: 4,
+        title: "04. 매칭 정점 vs 매칭되지 않은 정점 (Free)",
+        phase: "기초 개념",
+        icon: "user-check",
+        desc: `매칭된 간선에 포함되는 정점(<code>1, 2, 4, B, D, E</code>)을 <strong>'매칭한다(Matched)'</strong>고 하고, 포함되지 않는 정점(<code>3, 5, A, C, F</code>)을 <strong>'매칭하지 않는다(Unmatched / Free)'</strong>고 합니다.`,
+        onepoint: "알고리즘의 목표는 매칭되지 않은(Free) 정점들에게 새로운 짝을 찾아주는 것입니다.",
+        matching: ['1-B', '2-E', '4-D'],
+        path: [],
+        highlightNodes: ['3', '5', 'A', 'C', 'F'],
+      },
+      {
+        step: 5,
+        title: "05. 매칭의 크기(Size)와 최대 매칭",
+        phase: "기초 개념",
+        icon: "maximize-2",
+        desc: `매칭에 포함된 간선의 수를 <strong>매칭의 크기</strong>라고 합니다. 현재 매칭의 크기는 <strong>3</strong>입니다.<br/><br/>
+               매칭의 크기가 클수록 더 많은 작업을 처리할 수 있으므로, <strong>크기가 가장 큰 매칭(최대 매칭, Maximum Matching)</strong>을 구하는 것이 목표입니다.`,
+        onepoint: "현재 3개의 작업이 배정되어 있습니다. 더 많이 배정할 수 있을까요?",
+        matching: ['1-B', '2-E', '4-D'],
+        path: [],
+        highlightNodes: [],
+      },
+      {
+        step: 6,
+        title: "06. 단순 간선 추가의 한계 (탐욕법의 실패)",
+        phase: "문제 발견",
+        icon: "slash",
+        desc: `매칭의 크기를 키우려고 선택되지 않은 어떤 간선(예: 3-B)을 그냥 추가해보면 정점이 중복 공유되고 맙니다.<br/><br/>
+               즉, <strong>단순히 간선을 하나 더 긋는 것만으로는 매칭 크기를 키울 수 없습니다!</strong> 기존 매칭을 재배치하는 특별한 방법이 필요합니다.`,
+        onepoint: "이미 짝이 있는 정점들을 '양보'시켜서 연쇄적으로 재배치해야 합니다.",
+        matching: ['1-B', '2-E', '4-D'],
+        path: [],
+        highlightNodes: ['3', 'B'],
+      },
+      {
+        step: 7,
+        title: "07. 증가 경로(Augmenting Path)의 발견!",
+        phase: "핵심 원리",
+        icon: "sparkles",
+        desc: `매칭되지 않은 정점에서 출발하여 <strong>미매칭 간선</strong>과 <strong>매칭 간선</strong>을 번갈아 가며 이동하여 매칭되지 않은 정점으로 끝나는 경로를 <strong>증가 경로</strong>라고 합니다.<br/><br/>
+               경로: <code>3 (Free) → B [매칭] 1 → D [매칭] 4 → F (Free)</code><br/>
+               이 경로에서 <strong>미매칭 간선(3개)</strong>의 수가 매칭 간선(2개)보다 <strong>정확히 1개 더 많습니다!</strong>`,
+        onepoint: "증가 경로는 [미매칭 → 매칭 → 미매칭 → 매칭 → 미매칭] 처럼 홀수 개의 간선으로 구성됩니다.",
+        matching: ['1-B', '2-E', '4-D'],
+        path: ['3', 'B', '1', 'D', '4', 'F'],
+        highlightNodes: ['3', 'F'],
+      },
+      {
+        step: 8,
+        title: "08. 증가 경로 위의 매칭 간선 제외하기",
+        phase: "핵심 원리",
+        icon: "scissors",
+        desc: `증가 경로에서 기존에 매칭에 사용되던 간선 <code>(B, 1)</code>과 <code>(D, 4)</code>를 매칭에서 제외합니다.<br/><br/>
+               경로에 포함되지 않은 <code>(2, E)</code>는 그대로 유지됩니다.`,
+        onepoint: "기존의 짝을 풀어서 새로운 짝을 맺을 준비를 합니다.",
+        matching: ['2-E'],
+        path: ['3', 'B', '1', 'D', '4', 'F'],
+        highlightNodes: ['1', '4', 'B', 'D'],
+      },
+      {
+        step: 9,
+        title: "09. 미매칭 간선을 매칭으로 채택! (크기 4 달성)",
+        phase: "핵심 원리",
+        icon: "zap",
+        desc: `사용되지 않던 간선 <code>(3, B)</code>, <code>(1, D)</code>, <code>(4, F)</code>를 매칭에 추가하면 매칭 크기가 <strong>3에서 4로 +1 증가</strong>합니다!<br/><br/>
+               새로운 매칭: <code>(1 - D)</code>, <code>(2 - E)</code>, <code>(3 - B)</code>, <code>(4 - F)</code>.<br/>
+               <strong>증가 경로가 없을 때까지 이 과정을 반복하면 최대 매칭이 됩니다.</strong>`,
+        onepoint: "Berge's Lemma: 증가 경로가 더 이상 존재하지 않으면 그 매칭은 무조건 최대 매칭입니다!",
+        matching: ['1-D', '2-E', '3-B', '4-F'],
+        path: [],
+        highlightNodes: ['1', '2', '3', '4', 'B', 'D', 'E', 'F'],
+      },
+      {
+        step: 10,
+        title: "10. 알고리즘: 미매칭 정점 선택 (BFS 시작)",
+        phase: "알고리즘 탐색",
+        icon: "search",
+        desc: `이제 컴퓨터가 <strong>증가 경로를 자동으로 찾는 탐색 알고리즘(BFS)</strong>을 살펴보겠습니다.<br/><br/>
+               초기 매칭(크기 3) 상태에서, 아직 매칭되지 않은 왼쪽 정점 중 <strong>정점 5</strong>를 시작점으로 선택합니다.`,
+        onepoint: "탐색은 항상 매칭되지 않은(Free) 정점을 루트(뿌리)로 삼아 시작합니다.",
+        matching: ['1-B', '2-E', '4-D'],
+        path: [],
+        highlightNodes: ['5'],
+        visitedNodes: ['5'],
+      },
+      {
+        step: 11,
+        title: "11. 미매칭 간선으로 오른쪽 정점 마크",
+        phase: "알고리즘 탐색",
+        icon: "arrow-right",
+        desc: `정점 5에 연결된 오른쪽 정점 <strong>B와 D</strong>를 마크합니다.<br/><br/>
+               B와 D는 둘 다 이미 다른 정점과 매칭 중이므로, 길이가 1인 단순 증가 경로가 아니며 다음 단계로 탐색을 이어갑니다.`,
+        onepoint: "만약 B나 D가 미매칭 상태였다면 즉시 1단계짜리 증가 경로를 찾은 것입니다!",
+        matching: ['1-B', '2-E', '4-D'],
+        path: [],
+        highlightNodes: ['5', 'B', 'D'],
+        visitedNodes: ['5', 'B', 'D'],
+      },
+      {
+        step: 12,
+        title: "12. 매칭 간선을 따라 왼쪽 정점 마크",
+        phase: "알고리즘 탐색",
+        icon: "arrow-left",
+        desc: `마크한 정점 B와 D에 대해 <strong>'매칭 간선'으로 연결된 왼쪽 정점(1과 4)</strong>을 마크합니다.<br/><br/>
+               B는 1과 매칭되어 있고, D는 4와 매칭되어 있으므로 왼쪽 1과 4를 방문합니다.`,
+        onepoint: "오른쪽에서 왼쪽으로 갈 때는 반드시 '매칭 중인 간선'만 따라 이동해야 합니다.",
+        matching: ['1-B', '2-E', '4-D'],
+        path: [],
+        highlightNodes: ['5', 'B', 'D', '1', '4'],
+        visitedNodes: ['5', 'B', 'D', '1', '4'],
+      },
+      {
+        step: 13,
+        title: "13. 다시 미매칭 간선을 따라 오른쪽 확장",
+        phase: "알고리즘 탐색",
+        icon: "git-branch",
+        desc: `정점 1과 4에서 매칭에 사용되지 않은 간선으로 연결된 오른쪽 정점을 새롭게 마크합니다.<br/><br/>
+               정점 4에서 <strong>E와 F</strong>로 갈 수 있으므로 E와 F를 새롭게 마크합니다!`,
+        onepoint: "왼쪽→오른쪽은 '미매칭 간선', 오른쪽→왼쪽은 '매칭 간선'을 교대로 탑니다.",
+        matching: ['1-B', '2-E', '4-D'],
+        path: [],
+        highlightNodes: ['5', 'B', 'D', '1', '4', 'E', 'F'],
+        visitedNodes: ['5', 'B', 'D', '1', '4', 'E', 'F'],
+      },
+      {
+        step: 14,
+        title: "14. 미매칭 정점 F 도달! 증가 경로 확정",
+        phase: "알고리즘 탐색",
+        icon: "flag",
+        desc: `도착한 <strong>정점 F는 매칭되지 않은 정점(Free)</strong>입니다!<br/><br/>
+               따라서 정점 5에서 출발하여 F에 도착하는 경로 <code>5 → D → 4 → F</code>가 증가 경로로 완성되었습니다!`,
+        onepoint: "Free 정점을 만나는 순간 BFS 탐색을 종료하고 경로를 역추적(Backtrack)합니다.",
+        matching: ['1-B', '2-E', '4-D'],
+        path: ['5', 'D', '4', 'F'],
+        highlightNodes: ['5', 'F'],
+      },
+      {
+        step: 15,
+        title: "15. 크기 4 매칭에서 다시 탐색 시도",
+        phase: "최대 매칭 증명",
+        icon: "refresh-cw",
+        desc: `이제 크기 4 매칭(09단계 결과)에서 또 다른 증가 경로가 있는지 확인해봅니다.<br/><br/>
+               왼쪽의 유일한 미매칭 정점인 <strong>정점 5</strong>를 다시 선택하여 탐색을 시작합니다.`,
+        onepoint: "더 큰 매칭이 가능한지 검증하기 위해 미매칭 정점에서 탐색을 다시 돌립니다.",
+        matching: ['1-D', '2-E', '3-B', '4-F'],
+        path: [],
+        highlightNodes: ['5'],
+        visitedNodes: ['5'],
+      },
+      {
+        step: 16,
+        title: "16. 정점 5에서 B와 D 마크",
+        phase: "최대 매칭 증명",
+        icon: "search",
+        desc: `정점 5에 연결된 오른쪽 정점 <strong>B와 D</strong>를 마크합니다.<br/><br/>
+               현재 B는 3과 매칭되어 있고, D는 1과 매칭되어 있습니다.`,
+        onepoint: "B와 D는 여전히 매칭 중이므로 매칭 간선을 따라 왼쪽으로 이동합니다.",
+        matching: ['1-D', '2-E', '3-B', '4-F'],
+        path: [],
+        highlightNodes: ['5', 'B', 'D'],
+        visitedNodes: ['5', 'B', 'D'],
+      },
+      {
+        step: 17,
+        title: "17. 탐색 종료 & 최대 매칭(Maximum Matching) 확정!",
+        phase: "완료 & 증명",
+        icon: "award",
+        desc: `매칭 간선으로 연결된 왼쪽 정점 <strong>1과 3</strong>을 마크합니다.<br/><br/>
+               1과 3에서 연결된 미매칭 간선의 오른쪽 정점(B, D)은 <strong>이미 방문한 상태</strong>이므로 더 이상 새로운 정점을 마크할 수 없어 탐색이 멈춥니다.<br/><br/>
+               왼쪽의 미매칭 정점(5)에서 출발하는 <strong>증가 경로가 존재하지 않으므로</strong>, 현재 매칭(크기 4)이 <strong>최대 매칭</strong>임이 증명되었습니다!`,
+        onepoint: "🎉 증가 경로가 0개 = 최대 매칭! 알고리즘이 완벽하게 증명하며 종료됩니다.",
+        matching: ['1-D', '2-E', '3-B', '4-F'],
+        path: [],
+        highlightNodes: ['1', '2', '3', '4', 'B', 'D', 'E', 'F'],
+        visitedNodes: ['5', 'B', 'D', '1', '3'],
+        isMax: true,
+      },
+    ];
+
+    // --- BFS SUBSTEP HANDLERS ---
+    function setBfsScenario(type) {
+      currentBfsScenario = type;
+      currentBfsSubstep = 1;
+
+      const btnSucc = document.getElementById('btn-scen-succ');
+      const btnFail = document.getElementById('btn-scen-fail');
+      if (type === 'success') {
+        btnSucc.className = 'text-xs px-2.5 py-1 rounded-lg font-bold bg-sky-500 text-white shadow-sm transition';
+        btnFail.className = 'text-xs px-2.5 py-1 rounded-lg font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition';
+      } else {
+        btnFail.className = 'text-xs px-2.5 py-1 rounded-lg font-bold bg-sky-500 text-white shadow-sm transition';
+        btnSucc.className = 'text-xs px-2.5 py-1 rounded-lg font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition';
+      }
+
+      renderBfsSubstep();
+    }
+
+    function nextBfsSubStep() {
+      const stages = currentBfsScenario === 'success' ? bfsSuccessStages : bfsFailStages;
+      if (currentBfsSubstep < stages.length) {
+        currentBfsSubstep++;
+        renderBfsSubstep();
+      }
+    }
+
+    function prevBfsSubStep() {
+      if (currentBfsSubstep > 1) {
+        currentBfsSubstep--;
+        renderBfsSubstep();
+      }
+    }
+
+    function renderBfsSubstep() {
+      const stages = currentBfsScenario === 'success' ? bfsSuccessStages : bfsFailStages;
+      const data = stages[currentBfsSubstep - 1];
+
+      document.getElementById('bfs-substep-badge').textContent = `Stage ${data.stage} / ${stages.length}`;
+      document.getElementById('bfs-substep-title').textContent = data.title;
+      document.getElementById('bfs-substep-desc').innerHTML = data.desc;
+      document.getElementById('bfs-table-queue').textContent = data.queue;
+      document.getElementById('bfs-table-visited').textContent = `{ ${data.visited.join(', ')} }`;
+      document.getElementById('bfs-table-result').textContent = data.res;
+
+      currentMatchedEdges = new Set(data.matching);
+      currentAugmentingPath = [...data.path];
+      highlightedNodes = new Set(data.highlight);
+      visitedNodesInBfs = new Set(data.visited);
+
+      renderGraph();
+
+      if (window.renderMathInElement) {
+        renderMathInElement(document.getElementById('bfs-substep-desc'));
+      }
+    }
+
+    // --- RENDER GRAPH ---
+    function renderGraph() {
+      const edgesLayer = document.getElementById('edges-layer');
+      const nodesLayer = document.getElementById('nodes-layer');
+      edgesLayer.innerHTML = '';
+      nodesLayer.innerHTML = '';
+
+      const matchedNodeCounts = {};
+      currentMatchedEdges.forEach(edgeKey => {
+        const [u, v] = edgeKey.split('-');
+        matchedNodeCounts[u] = (matchedNodeCounts[u] || 0) + 1;
+        matchedNodeCounts[v] = (matchedNodeCounts[v] || 0) + 1;
+      });
+
+      // 1. Draw Edges
+      allEdges.forEach(edge => {
+        const key1 = `${edge.u}-${edge.v}`;
+        const key2 = `${edge.v}-${edge.u}`;
+        const isMatched = currentMatchedEdges.has(key1) || currentMatchedEdges.has(key2);
+
+        let isAugPathEdge = false;
+        let isAugMatched = false;
+        if (currentAugmentingPath.length > 1) {
+          for (let i = 0; i < currentAugmentingPath.length - 1; i++) {
+            const p1 = currentAugmentingPath[i];
+            const p2 = currentAugmentingPath[i + 1];
+            if ((p1 === edge.u && p2 === edge.v) || (p1 === edge.v && p2 === edge.u)) {
+              isAugPathEdge = true;
+              isAugMatched = isMatched;
+              break;
+            }
+          }
+        }
+
+        const p1 = nodeCoords[edge.u];
+        const p2 = nodeCoords[edge.v];
+        const hasConflict = isMatched && ((matchedNodeCounts[edge.u] > 1) || (matchedNodeCounts[edge.v] > 1));
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', p1.x);
+        line.setAttribute('y1', p1.y);
+        line.setAttribute('x2', p2.x);
+        line.setAttribute('y2', p2.y);
+        line.setAttribute('data-edge', key1);
+        line.classList.add('edge-line', 'cursor-pointer');
+
+        if (hasConflict) {
+          line.setAttribute('stroke', '#ef4444');
+          line.setAttribute('stroke-width', '4');
+          line.setAttribute('stroke-dasharray', '4 4');
+        } else if (isAugPathEdge) {
+          if (isAugMatched) {
+            line.setAttribute('stroke', '#f97316');
+            line.setAttribute('stroke-width', '5');
+            line.setAttribute('filter', 'url(#glow-orange)');
+          } else {
+            line.setAttribute('stroke', '#0ea5e9');
+            line.setAttribute('stroke-width', '4');
+            line.classList.add('anim-dash');
+            line.setAttribute('filter', 'url(#glow-sky)');
+          }
+        } else if (isMatched) {
+          line.setAttribute('stroke', '#f97316');
+          line.setAttribute('stroke-width', '4');
+        } else {
+          line.setAttribute('stroke', document.documentElement.classList.contains('dark') ? '#475569' : '#cbd5e1');
+          line.setAttribute('stroke-width', '2');
+          line.setAttribute('opacity', '0.6');
+        }
+
+        line.addEventListener('click', () => {
+          toggleEdgeMatching(key1);
+        });
+
+        line.addEventListener('mouseenter', () => {
+          if (!isMatched && !isAugPathEdge) {
+            line.setAttribute('stroke', '#94a3b8');
+            line.setAttribute('stroke-width', '3');
+            line.setAttribute('opacity', '1');
+          }
+        });
+        line.addEventListener('mouseleave', () => {
+          if (!isMatched && !isAugPathEdge) {
+            line.setAttribute('stroke', document.documentElement.classList.contains('dark') ? '#475569' : '#cbd5e1');
+            line.setAttribute('stroke-width', '2');
+            line.setAttribute('opacity', '0.6');
+          }
+        });
+
+        edgesLayer.appendChild(line);
+      });
+
+      // 2. Draw Nodes
+      const allNodeKeys = [...leftNodes, ...rightNodes];
+      allNodeKeys.forEach(nodeKey => {
+        const coord = nodeCoords[nodeKey];
+        const isLeft = leftNodes.includes(nodeKey);
+        const isMatched = (matchedNodeCounts[nodeKey] || 0) > 0;
+        const hasConflict = (matchedNodeCounts[nodeKey] || 0) > 1;
+        const isHighlighted = highlightedNodes.has(nodeKey);
+        const isBfsVisited = visitedNodesInBfs.has(nodeKey);
+
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('transform', `translate(${coord.x}, ${coord.y})`);
+        g.classList.add('node-circle');
+
+        if (isHighlighted || isBfsVisited) {
+          const outerRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          outerRing.setAttribute('r', '24');
+          outerRing.setAttribute('fill', 'none');
+          outerRing.setAttribute('stroke', isHighlighted ? '#f97316' : '#0ea5e9');
+          outerRing.setAttribute('stroke-width', '3');
+          outerRing.setAttribute('stroke-dasharray', '4 4');
+          outerRing.classList.add('anim-dash');
+          g.appendChild(outerRing);
+        }
+
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('r', '17');
+        circle.classList.add('main-circle');
+
+        if (hasConflict) {
+          circle.setAttribute('fill', '#fef2f2');
+          circle.setAttribute('stroke', '#ef4444');
+          circle.setAttribute('stroke-width', '3');
+        } else if (isMatched) {
+          circle.setAttribute('fill', '#ea580c');
+          circle.setAttribute('stroke', '#f97316');
+          circle.setAttribute('stroke-width', '2.5');
+        } else {
+          circle.setAttribute('fill', document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff');
+          circle.setAttribute('stroke', document.documentElement.classList.contains('dark') ? '#64748b' : '#94a3b8');
+          circle.setAttribute('stroke-width', '2');
+        }
+        g.appendChild(circle);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dy', '5');
+        text.setAttribute('font-size', '13');
+        text.setAttribute('font-weight', 'bold');
+        text.setAttribute('font-family', 'sans-serif');
+        text.setAttribute('fill', isMatched ? '#ffffff' : (document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b'));
+        text.setAttribute('pointer-events', 'none');
+        text.textContent = nodeKey;
+        g.appendChild(text);
+
+        const subLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        subLabel.setAttribute('text-anchor', isLeft ? 'end' : 'start');
+        subLabel.setAttribute('x', isLeft ? '-24' : '24');
+        subLabel.setAttribute('dy', '4');
+        subLabel.setAttribute('font-size', '10');
+        subLabel.setAttribute('fill', document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b');
+        subLabel.setAttribute('pointer-events', 'none');
+        subLabel.textContent = isLeft ? `사람 ${nodeKey}` : `작업 ${nodeKey}`;
+        g.appendChild(subLabel);
+
+        g.addEventListener('click', () => {
+          onNodeClick(nodeKey);
+        });
+
+        nodesLayer.appendChild(g);
+      });
+
+      const matchSize = currentMatchedEdges.size;
+      document.getElementById('canvas-matching-size').textContent = matchSize;
+      
+      const badgeMax = document.getElementById('badge-max-matching');
+      if (matchSize >= 4 && !hasConflict(matchedNodeCounts)) {
+        badgeMax.classList.remove('hidden');
+      } else {
+        badgeMax.classList.add('hidden');
+      }
+
+      const actionBar = document.getElementById('augment-action-bar');
+      if (currentAugmentingPath.length > 1) {
+        actionBar.classList.remove('hidden');
+        document.getElementById('current-path-text').textContent = currentAugmentingPath.join(' → ');
+      } else {
+        actionBar.classList.add('hidden');
+      }
+    }
+
+    function hasConflict(counts) {
+      for (const k in counts) {
+        if (counts[k] > 1) return true;
+      }
+      return false;
+    }
+
+    function toggleEdgeMatching(edgeKey) {
+      if (currentMatchedEdges.has(edgeKey)) {
+        currentMatchedEdges.delete(edgeKey);
+      } else {
+        currentMatchedEdges.add(edgeKey);
+      }
+      currentAugmentingPath = [];
+      renderGraph();
+    }
+
+    function onNodeClick(nodeKey) {
+      if (leftNodes.includes(nodeKey)) {
+        const path = findBfsAugmentingPathFrom(nodeKey);
+        if (path) {
+          currentAugmentingPath = path;
+          showToast(`정점 ${nodeKey}에서 시작하는 증가 경로 발견! [상태 반전] 버튼을 눌러보세요.`);
+        } else {
+          currentAugmentingPath = [];
+          showToast(`정점 ${nodeKey}에서는 증가 경로를 찾을 수 없습니다.`);
+        }
+        renderGraph();
+      }
+    }
+
+    // --- BFS AUGMENTING PATH ALGORITHM ---
+    function findBfsAugmentingPathFrom(startNode) {
+      const isMatched = Array.from(currentMatchedEdges).some(e => e.startsWith(`${startNode}-`) || e.endsWith(`-${startNode}`));
+      if (isMatched) {
+        showToast(`정점 ${startNode}은 이미 매칭되어 있어 증가 경로의 시작점이 될 수 없습니다.`);
+        return null;
+      }
+
+      const queue = [startNode];
+      const visited = new Set([startNode]);
+      const parent = {};
+
+      while (queue.length > 0) {
+        const u = queue.shift();
+
+        if (leftNodes.includes(u)) {
+          const neighbors = allEdges.filter(e => e.u === u).map(e => e.v);
+          for (const v of neighbors) {
+            const edgeKey = `${u}-${v}`;
+            if (!currentMatchedEdges.has(edgeKey) && !visited.has(v)) {
+              visited.add(v);
+              parent[v] = u;
+
+              const isVMatched = Array.from(currentMatchedEdges).some(e => e.endsWith(`-${v}`));
+              if (!isVMatched) {
+                const path = [];
+                let curr = v;
+                while (curr !== undefined) {
+                  path.unshift(curr);
+                  curr = parent[curr];
+                }
+                return path;
+              }
+
+              queue.push(v);
+            }
+          }
+        } else {
+          for (const edgeKey of currentMatchedEdges) {
+            const [lu, rv] = edgeKey.split('-');
+            if (rv === u && !visited.has(lu)) {
+              visited.add(lu);
+              parent[lu] = u;
+              queue.push(lu);
+              break;
+            }
+          }
+        }
+      }
+
+      return null;
+    }
+
+    function executeFlipAugment() {
+      if (currentAugmentingPath.length < 2) return;
+
+      for (let i = 0; i < currentAugmentingPath.length - 1; i++) {
+        const u = currentAugmentingPath[i];
+        const v = currentAugmentingPath[i + 1];
+        const key = `${u}-${v}`;
+        const keyAlt = `${v}-${u}`;
+
+        if (currentMatchedEdges.has(key)) {
+          currentMatchedEdges.delete(key);
+        } else if (currentMatchedEdges.has(keyAlt)) {
+          currentMatchedEdges.delete(keyAlt);
+        } else {
+          if (leftNodes.includes(u)) {
+            currentMatchedEdges.add(key);
+          } else {
+            currentMatchedEdges.add(keyAlt);
+          }
+        }
+      }
+
+      const prevPath = [...currentAugmentingPath];
+      currentAugmentingPath = [];
+      renderGraph();
+
+      if (currentMatchedEdges.size >= 4) {
+        confetti({
+          particleCount: 60,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
+
+      showToast(`증가 경로(${prevPath.join('→')}) 반전 완료! 매칭 크기가 +1 늘어났습니다.`);
+    }
+
+    // --- STEP CONTROLLER ---
+    function goToStep(stepNum) {
+      if (stepNum < 1 || stepNum > stepData.length) return;
+      currentStep = stepNum;
+      const data = stepData[stepNum - 1];
+
+      document.getElementById('step-slider').value = stepNum;
+      document.getElementById('step-badge').textContent = `Step ${String(stepNum).padStart(2, '0')} / 17`;
+      document.getElementById('step-phase-tag').textContent = data.phase;
+      document.getElementById('step-title').textContent = data.title;
+      document.getElementById('step-description').innerHTML = data.desc;
+      document.getElementById('step-onepoint-text').textContent = data.onepoint;
+
+      const iconEl = document.getElementById('step-icon');
+      iconEl.setAttribute('data-lucide', data.icon || 'info');
+      lucide.createIcons();
+
+      currentMatchedEdges = new Set(data.matching || []);
+      currentAugmentingPath = [...(data.path || [])];
+      highlightedNodes = new Set(data.highlightNodes || []);
+      visitedNodesInBfs = new Set(data.visitedNodes || []);
+
+      const actionBox = document.getElementById('step-action-container');
+      actionBox.innerHTML = '';
+      if (data.path && data.path.length > 0) {
+        const btn = document.createElement('button');
+        btn.className = 'w-full py-2 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 active:scale-98';
+        btn.innerHTML = `<i data-lucide="zap" class="w-4 h-4"></i> 이 경로 반전시켜 크기 +1 늘리기 (09단계로 이동)`;
+        btn.onclick = () => {
+          goToStep(9);
+        };
+        actionBox.appendChild(btn);
+        lucide.createIcons();
+      }
+
+      renderGraph();
+
+      if (window.renderMathInElement) {
+        renderMathInElement(document.getElementById('step-description'));
+      }
+    }
+
+    function nextStep() {
+      if (currentStep < stepData.length) {
+        goToStep(currentStep + 1);
+      } else {
+        stopAutoplay();
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 1) {
+        goToStep(currentStep - 1);
+      }
+    }
+
+    function toggleAutoplay() {
+      if (autoplayInterval) {
+        stopAutoplay();
+      } else {
+        startAutoplay();
+      }
+    }
+
+    function startAutoplay() {
+      document.getElementById('autoplay-text').textContent = '정지';
+      const icon = document.querySelector('#btn-autoplay i');
+      icon.setAttribute('data-lucide', 'pause');
+      lucide.createIcons();
+
+      autoplayInterval = setInterval(() => {
+        if (currentStep >= stepData.length) {
+          goToStep(1);
+        } else {
+          nextStep();
+        }
+      }, 3200);
+    }
+
+    function stopAutoplay() {
+      clearInterval(autoplayInterval);
+      autoplayInterval = null;
+      document.getElementById('autoplay-text').textContent = '자동재생';
+      const icon = document.querySelector('#btn-autoplay i');
+      icon.setAttribute('data-lucide', 'play');
+      lucide.createIcons();
+    }
+
+    // --- PRESETS ---
+    function loadPreset(type) {
+      if (type === 'initial') {
+        goToStep(5);
+      } else if (type === 'augmented') {
+        goToStep(9);
+      } else if (type === 'empty') {
+        currentMatchedEdges.clear();
+        currentAugmentingPath = [];
+        highlightedNodes.clear();
+        visitedNodesInBfs.clear();
+        renderGraph();
+        showToast("모든 매칭을 초기화했습니다.");
+      }
+    }
+
+    // --- FREE SANDBOX BFS ---
+    function runBfsAugmentStepByStep() {
+      const freeLeft = leftNodes.filter(u => !Array.from(currentMatchedEdges).some(e => e.startsWith(`${u}-`)));
+      if (freeLeft.length === 0) {
+        showToast("왼쪽에 매칭되지 않은 정점이 없어 더 이상 증가 경로를 찾을 수 없습니다.");
+        return;
+      }
+
+      for (const u of freeLeft) {
+        const path = findBfsAugmentingPathFrom(u);
+        if (path) {
+          currentAugmentingPath = path;
+          renderGraph();
+          showToast(`정점 ${u}에서 시작하는 증가 경로를 찾았습니다! [상태 반전] 버튼을 눌러보세요.`);
+          return;
+        }
+      }
+
+      showToast("모든 미매칭 정점을 탐색했으나 증가 경로가 없습니다. 현재 상태가 최대 매칭입니다!");
+    }
+
+    function autoSolveMaximumMatching() {
+      let augmented = false;
+      do {
+        augmented = false;
+        const freeLeft = leftNodes.filter(u => !Array.from(currentMatchedEdges).some(e => e.startsWith(`${u}-`)));
+        for (const u of freeLeft) {
+          const path = findBfsAugmentingPathFrom(u);
+          if (path) {
+            currentAugmentingPath = path;
+            executeFlipAugment();
+            augmented = true;
+            break;
+          }
+        }
+      } while (augmented);
+
+      confetti({ particleCount: 70, spread: 80 });
+      showToast("최대 매칭(크기 " + currentMatchedEdges.size + ") 탐색이 완료되었습니다!");
+    }
+
+    // --- TAB SWITCHER ---
+    function switchMainTab(tab) {
+      const tabs = ['bfshub', 'story', 'domino', 'sandbox', 'quiz'];
+      tabs.forEach(t => {
+        const panel = document.getElementById(`panel-${t}`);
+        const btnDesktop = document.getElementById(`btn-tab-${t}`);
+        const btnMobile = document.getElementById(`mob-tab-${t}`);
+
+        if (t === tab) {
+          panel.classList.remove('hidden');
+          if (btnDesktop) {
+            btnDesktop.className = 'px-3 py-1.5 rounded-lg transition-all bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 shadow-sm font-bold flex items-center gap-1.5';
+          }
+          if (btnMobile) {
+            btnMobile.className = 'px-3 py-1 rounded bg-sky-50 dark:bg-sky-950 text-sky-600 font-bold whitespace-nowrap';
+          }
+        } else {
+          panel.classList.add('hidden');
+          if (btnDesktop) {
+            btnDesktop.className = 'px-3 py-1.5 rounded-lg transition-all text-slate-600 dark:text-slate-300 hover:text-sky-600 font-semibold';
+          }
+          if (btnMobile) {
+            btnMobile.className = 'px-3 py-1 text-slate-600 dark:text-slate-300 whitespace-nowrap';
+          }
+        }
+      });
+      lucide.createIcons();
+
+      if (tab === 'bfshub') {
+        renderBfsSubstep();
+      }
+    }
+
+    // --- QUIZ HANDLER ---
+    function checkQuiz(qNum, selectedIndex) {
+      const container = document.getElementById('quiz-container');
+      const qBlock = container.children[qNum - 1];
+      const buttons = qBlock.querySelectorAll('.quiz-btn');
+      const feedback = document.getElementById(`quiz-feedback-${qNum}`);
+
+      const correctBtnIndex = Array.from(buttons).findIndex(b => b.getAttribute('data-correct') === 'true');
+      const isCorrect = (selectedIndex === correctBtnIndex);
+
+      buttons.forEach((btn, idx) => {
+        btn.disabled = true;
+        if (idx === correctBtnIndex) {
+          btn.classList.add('bg-emerald-50', 'dark:bg-emerald-950/60', 'border-emerald-500', 'text-emerald-700', 'dark:text-emerald-300', 'font-bold');
+        } else if (idx === selectedIndex && !isCorrect) {
+          btn.classList.add('bg-rose-50', 'dark:bg-rose-950/60', 'border-rose-500', 'text-rose-700', 'dark:text-rose-300');
+        }
+      });
+
+      feedback.classList.remove('hidden');
+      if (isCorrect) {
+        feedback.className = 'mt-2 p-2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 text-[11px] font-medium';
+        feedback.innerHTML = '🎉 <strong>정답입니다!</strong> ' + getQuizExplanation(qNum);
+        if (!answeredQuestions.has(qNum)) {
+          quizScore++;
+          answeredQuestions.add(qNum);
+        }
+      } else {
+        feedback.className = 'mt-2 p-2 rounded bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-200 text-[11px] font-medium';
+        feedback.innerHTML = '❌ <strong>틀렸습니다.</strong> ' + getQuizExplanation(qNum);
+      }
+
+      document.getElementById('quiz-score').textContent = `${quizScore} / 3 정답`;
+    }
+
+    function getQuizExplanation(qNum) {
+      if (qNum === 1) return '증가 경로는 반드시 양 끝이 매칭되지 않은(Free) 정점으로 끝나야 전체 매칭 크기를 +1 늘릴 수 있습니다.';
+      if (qNum === 2) return '증가 경로는 [미매칭 → 매칭 → ... → 미매칭] 구조이므로 항상 미매칭 간선이 1개 더 많습니다.';
+      if (qNum === 3) return 'Berge의 정리에 의해 증가 경로가 없다는 것은 더 이상 매칭을 키울 수 없는 최대 매칭임을 뜻합니다.';
+      return '';
+    }
+
+    // --- DARK MODE ---
+    function toggleDarkMode() {
+      document.documentElement.classList.toggle('dark');
+      renderGraph();
+    }
+
+    // --- TOAST HINT ---
+    let toastTimeout;
+    function showToast(msg) {
+      const hint = document.getElementById('canvas-hint');
+      hint.querySelector('span').textContent = msg;
+      hint.style.opacity = '1';
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        hint.style.opacity = '0.9';
+        hint.querySelector('span').textContent = '왼쪽 미매칭 정점(3번, 5번)을 클릭하면 증가 경로를 탐색합니다.';
+      }, 3500);
+    }
+
+    // --- INIT ---
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      switchMainTab('bfshub');
+    });
+  </script>
+</body>
+</html>

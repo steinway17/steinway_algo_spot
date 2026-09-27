@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AlgoHarness | 파이썬 알고리즘 학습 & 시각화 훈련소</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+            }
+          },
+          fontFamily: {
+            sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google & Pretendard Fonts -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+
+  <!-- CodeMirror 5 CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-sky-500 selection:text-white">
+
+  <!-- TOP HEADER -->
+  <header class="bg-slate-900/90 border-b border-slate-800 sticky top-0 z-30 backdrop-blur">
+    <div class="max-w-[1920px] mx-auto px-4 lg:px-6 h-14 flex items-center justify-between">
+      <!-- Logo & Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20">
+          <i data-lucide="cpu" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-sm tracking-tight text-white">AlgoHarness</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-400 border border-sky-500/30">Pyodide Wasm</span>
+          </div>
+          <p class="text-[11px] text-slate-400 hidden sm:block">실시간 알고리즘 실행 & 시각화 반복 훈련 하네스</p>
+        </div>
+      </div>
+
+      <!-- Center Problem Quick Switcher -->
+      <div class="flex items-center gap-2">
+        <label for="problemSelector" class="text-xs text-slate-400 font-medium hidden md:block">학습 문제:</label>
+        <select id="problemSelector" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer max-w-[220px] sm:max-w-[320px]">
+          <option value="01_two_pointers">01. 두 수의 합 (Two Pointers)</option>
+          <option value="02_binary_search">02. 이분 탐색 (Binary Search)</option>
+          <option value="03_valid_parentheses">03. 올바른 괄호 검사 (Stack)</option>
+          <option value="04_bfs_maze">04. 미로 최단거리 (BFS Queue)</option>
+          <option value="05_dfs_backtracking">05. 수열 생성 (DFS 백트래킹)</option>
+          <option value="06_bipartite_matching">06. 🔗 이분 매칭 & 증가 경로 (심화)</option>
+        </select>
+      </div>
+
+      <!-- Right Actions & Status -->
+      <div class="flex items-center gap-3">
+        <!-- Pyodide Status Badge -->
+        <div id="pyodideStatusBadge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          <span class="w-2 h-2 rounded-full bg-amber-400 animate-spin"></span>
+          <span>Wasm 로딩 중...</span>
+        </div>
+
+        <!-- Curriculum Graph Button -->
+        <button id="btnCurriculumGraph" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition shadow-sm">
+          <i data-lucide="network" class="w-3.5 h-3.5 text-sky-400"></i>
+          <span>지식 그래프</span>
+        </button>
+
+        <!-- Advanced Bipartite Matching Tab -->
+        <a href="bipartite_matching.html" class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-950/60 hover:bg-purple-900 border border-purple-700/60 text-purple-200 transition shadow-sm">
+          <i data-lucide="git-merge" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span>심화: 이분 매칭</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN 3-PANEL WORKSPACE -->
+  <main class="flex-1 max-w-[1920px] w-full mx-auto p-3 lg:p-4 grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-4 overflow-hidden">
+    
+    <!-- LEFT PANEL: Problem Info & 4-Step Scaffolding Drill (4 cols) -->
+    <section class="lg:col-span-4 flex flex-col bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden min-h-[500px]">
+      
+      <!-- Drill Mode Tabs -->
+      <div class="p-2.5 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between gap-1 overflow-x-auto">
+        <button data-mode="observe" class="drill-mode-tab flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500 text-white shadow-sm shadow-sky-500/20" title="정답 알고리즘 실행과 시각화 흐름 관찰">
+          <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+          <span>1단계 관찰</span>
+        </button>
+
+        <button data-mode="fill" class="drill-mode-tab flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="핵심 조건/포인터 이동 빈칸 채우기">
+          <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+          <span>2단계 빈칸</span>
+        </button>
+
+        <button data-mode="blank" class="drill-mode-tab flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="빈 에디터에서 자력으로 100% 구현">
+          <i data-lucide="file-code" class="w-3.5 h-3.5"></i>
+          <span>3단계 백지</span>
+          <i data-lucide="lock" class="w-3 h-3 text-slate-500 lock-icon hidden"></i>
+        </button>
+
+        <button data-mode="speed" class="drill-mode-tab flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="3분 타이머 내에 망설임 없이 완성">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span>4단계 스피드</span>
+          <i data-lucide="lock" class="w-3 h-3 text-slate-500 lock-icon hidden"></i>
+        </button>
+      </div>
+
+      <!-- Speedrun Timer Banner (Shown only in speedrun mode) -->
+      <div id="speedrunBar" class="hidden px-4 py-2 bg-amber-950/40 border-b border-amber-800/60 flex items-center justify-between text-xs">
+        <div class="flex items-center gap-2 text-amber-300 font-semibold">
+          <i data-lucide="timer" class="w-4 h-4 text-amber-400 animate-bounce"></i>
+          <span>스피드런 챌린지 (목표: 3분 이내 통과)</span>
+        </div>
+        <div class="flex items-center gap-1 text-sm">
+          <span class="text-slate-400 text-xs">남은 시간:</span>
+          <span id="speedTimerText" class="font-mono font-bold text-amber-300">03:00</span>
+        </div>
+      </div>
+
+      <!-- Problem Meta Header -->
+      <div class="p-4 border-b border-slate-800/80 bg-slate-900/40">
+        <div class="flex items-center justify-between mb-2">
+          <span id="problemCategory" class="px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20">카테고리</span>
+          <div class="flex items-center gap-2">
+            <span id="problemDifficulty" class="text-xs text-slate-400">기초 (Lv.1)</span>
+            <span id="problemComplexity" class="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">O(N)</span>
+          </div>
+        </div>
+        <h2 id="problemTitle" class="text-base font-bold text-white tracking-tight">문제 제목</h2>
+      </div>
+
+      <!-- Problem Body Scrollable -->
+      <div class="flex-1 p-4 overflow-y-auto space-y-4" id="problemScrollContent">
+        <!-- Hints Box for Fill Mode -->
+        <div id="fillHintsSection" class="hidden">
+          <button id="btnToggleHint" class="w-full flex items-center justify-between p-2.5 rounded-xl bg-amber-950/20 border border-amber-800/40 text-amber-300 hover:bg-amber-950/30 transition text-xs font-semibold">
+            <div class="flex items-center gap-2">
+              <i data-lucide="lightbulb" class="w-4 h-4 text-amber-400"></i>
+              <span>빈칸 해결 힌트 보기</span>
+            </div>
+            <i data-lucide="chevron-down" class="w-4 h-4"></i>
+          </button>
+          <div id="fillHintsBox" class="mt-2 hidden">
+            <ul id="fillHintsList" class="space-y-1.5 text-xs text-slate-300"></ul>
+          </div>
+        </div>
+
+        <!-- Rendered Problem HTML -->
+        <div id="problemDescription" class="prose prose-invert max-w-none text-xs text-slate-300 leading-relaxed">
+          <!-- Dynamic loaded problem description -->
+        </div>
+      </div>
+    </section>
+
+    <!-- CENTER PANEL: Code Editor & Execution Actions (4 cols) -->
+    <section class="lg:col-span-4 flex flex-col bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden min-h-[500px]">
+      
+      <!-- Editor Toolbar -->
+      <div class="p-2 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between flex-wrap gap-1.5">
+        <div class="flex items-center gap-2">
+          <i data-lucide="terminal" class="w-4 h-4 text-sky-400"></i>
+          <span class="text-xs font-bold text-slate-200">solution.py</span>
+        </div>
+
+        <!-- Input Scale Selector -->
+        <div class="flex items-center gap-1 bg-slate-900/90 p-0.5 rounded-lg border border-slate-800 text-[11px] font-mono">
+          <span class="text-[10px] text-slate-500 px-1 font-sans">입력 크기:</span>
+          <button data-scale="small" class="scale-btn px-2 py-0.5 rounded font-bold bg-sky-500 text-white shadow-sm" title="시각화용 기본 크기">Small</button>
+          <button data-scale="medium" class="scale-btn px-2 py-0.5 rounded text-slate-400 hover:text-white transition" title="중간 규모 (N≈1,000)">Medium</button>
+          <button data-scale="large" class="scale-btn px-2 py-0.5 rounded text-slate-400 hover:text-white transition" title="대규모 벤치마크 (N≈30,000~100,000)">Large</button>
+        </div>
+
+        <button id="btnResetCode" class="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs transition" title="현재 모드의 기본 템플릿으로 초기화">
+          <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+          <span>초기화</span>
+        </button>
+      </div>
+
+      <!-- CodeMirror Container -->
+      <div class="flex-1 relative overflow-hidden bg-slate-900">
+        <textarea id="pythonCodeEditor" class="hidden"></textarea>
+      </div>
+
+      <!-- Editor Bottom Actions -->
+      <div class="p-3 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between gap-2">
+        <button id="btnRun" class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+          <i data-lucide="play" class="w-4 h-4 text-sky-400"></i>
+          <span>예제 실행 & 트레이스</span>
+        </button>
+
+        <button id="btnSubmit" class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white transition shadow-md shadow-sky-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+          <i data-lucide="check-circle" class="w-4 h-4"></i>
+          <span>제출 및 단계 통과</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: Hybrid Visualizer & Judge Output (4 cols) -->
+    <section class="lg:col-span-4 flex flex-col gap-3 lg:gap-4 overflow-hidden">
+      
+      <!-- Top: Visualizer Hub (Height ~55%) -->
+      <div class="flex-1 min-h-[300px]" id="visualizerContainer">
+        <!-- Injected by VisualizerHub -->
+      </div>
+
+      <!-- Bottom: Test Case & Judge Output (Height ~45%) -->
+      <div class="h-64 flex flex-col bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+        <div class="px-4 py-2.5 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="check-square" class="w-4 h-4 text-emerald-400"></i>
+            <span class="text-xs font-bold text-slate-200">채점 및 테스트 케이스 검증</span>
+          </div>
+        </div>
+
+        <div class="flex-1 p-3 overflow-y-auto" id="judgeOutputArea">
+          <div class="text-center text-slate-500 py-12 text-xs">
+            <i data-lucide="sparkles" class="w-8 h-8 mx-auto mb-2 text-slate-600 stroke-1"></i>
+            <p>코드를 작성하고 [예제 실행] 또는 [제출]을 누르면<br/>테스트 케이스 검증 결과가 표시됩니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- CURRICULUM KNOWLEDGE GRAPH MODAL -->
+  <div id="curriculumModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center">
+            <i data-lucide="network" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">커리큘럼 지식 그래프 (DAG)</h3>
+            <p class="text-xs text-slate-400" id="graphStatsText">선행 단계를 통과하면 다음 알고리즘이 해금됩니다.</p>
+          </div>
+        </div>
+        <button id="btnCloseCurriculumModal" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Graph Nodes List -->
+      <div class="flex-1 overflow-y-auto space-y-2.5 pr-1" id="curriculumNodesList">
+        <!-- Rendered by app.renderCurriculumGraph() -->
+      </div>
+    </div>
+  </div>
+
+  <!-- LOAD SCRIPTS IN ORDER -->
+  <script src="js/storage/mastery_store.js"></script>
+  <script src="js/judge/judge_manager.js"></script>
+  <script src="js/visualizer/array_visualizer.js"></script>
+  <script src="js/visualizer/grid_maze_visualizer.js"></script>
+  <script src="js/visualizer/recursion_tree_visualizer.js"></script>
+  <script src="js/visualizer/graph_visualizer.js"></script>
+  <script src="js/visualizer/visualizer_hub.js"></script>
+  <script src="js/editor.js"></script>
+
+  <!-- Problem Data Scripts -->
+  <script src="js/data/problems/01_two_pointers.js"></script>
+  <script src="js/data/problems/02_binary_search.js"></script>
+  <script src="js/data/problems/03_valid_parentheses.js"></script>
+  <script src="js/data/problems/04_bfs_maze.js"></script>
+  <script src="js/data/problems/05_dfs_backtracking.js"></script>
+  <script src="js/data/curriculum_graph.js"></script>
+
+  <!-- App Main -->
+  <script src="js/app.js"></script>
+  <script>
+    // Initial Lucide Icons rendering
+    lucide.createIcons();
+  </script>
+</body>
+</html>

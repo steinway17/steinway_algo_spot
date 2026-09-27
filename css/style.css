@@ -1,0 +1,39 @@
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.8);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 1);
+}
+
+/* CodeMirror Active Trace Line Highlight */
+.cm-active-trace-line {
+  background: rgba(14, 165, 233, 0.25) !important;
+  border-left: 3px solid #38bdf8 !important;
+  transition: background 0.15s ease-in-out;
+}
+
+/* CodeMirror Dracule Tweaks */
+.CodeMirror {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+  background-color: #0f172a !important; /* slate-900 */
+}
+.CodeMirror-gutters {
+  background-color: #0b1120 !important;
+  border-right: 1px solid #1e293b !important;
+}
+
+/* Glow effects */
+.glow-sky {
+  box-shadow: 0 0 20px -5px rgba(14, 165, 233, 0.4);
+}
