@@ -611,6 +611,20 @@ class AlgorithmHarnessApp {
     const allPassed = payload.all_passed;
     const results = payload.results || [];
 
+    const formatInputForDisplay = (input) => {
+      if (input === undefined || input === null) return "None";
+      if (Array.isArray(input)) {
+        return input
+          .map((arg) => {
+            const str = typeof arg === "object" ? JSON.stringify(arg) : String(arg);
+            return str.length > 90 ? str.slice(0, 87) + "..." : str;
+          })
+          .join(", ");
+      }
+      const str = typeof input === "object" ? JSON.stringify(input) : String(input);
+      return str.length > 90 ? str.slice(0, 87) + "..." : str;
+    };
+
     // Special Benchmark Card for Medium/Large Scale Run
     if (!isSubmit && this.currentScale !== "small") {
       const scaleInfo = this.currentProblem.benchmarkScales?.[this.currentScale];
@@ -645,6 +659,23 @@ class AlgorithmHarnessApp {
             <p class="text-[11px] text-slate-300 mt-2 leading-relaxed">
               ${isPass ? `✨ 대규모 입력에서도 지연 없이 <strong>${this.currentProblem.timeComplexity}</strong> 시간복잡도로 초고속 처리되었습니다.` : '⚠️ 대규모 입력 처리 중 오답이 발생했습니다.'}
             </p>
+
+            ${!isPass ? `
+              <div class="font-mono text-[11px] bg-black/50 p-2.5 rounded-lg text-slate-300 flex flex-col gap-1.5 mt-2 border border-rose-900/60">
+                <div class="flex items-start gap-1.5">
+                  <span class="text-slate-400 shrink-0 font-sans font-semibold">입력값 (Input):</span>
+                  <span class="text-sky-300 font-bold break-all">${formatInputForDisplay(firstRes.input)}</span>
+                </div>
+                <div class="flex items-start gap-1.5">
+                  <span class="text-slate-400 shrink-0 font-sans font-semibold">기댓값 (Expected):</span>
+                  <span class="text-emerald-400 font-bold break-all">${JSON.stringify(firstRes.expected)}</span>
+                </div>
+                <div class="flex items-start gap-1.5">
+                  <span class="text-slate-400 shrink-0 font-sans font-semibold">실제값 (Actual):</span>
+                  <span class="text-rose-400 font-bold break-all">${JSON.stringify(firstRes.actual)}</span>
+                </div>
+              </div>
+            ` : ''}
           </div>
         </div>
       `;
@@ -671,10 +702,20 @@ class AlgorithmHarnessApp {
             ${
               !isPass
                 ? `
-              <div class="font-mono text-[11px] bg-black/40 p-2 rounded text-slate-300 flex flex-col gap-1 mt-1">
-                ${r.error ? `<div class="text-rose-400">${r.error}</div>` : ""}
-                <div><span class="text-slate-500">기댓값:</span> <span class="text-emerald-400 font-bold">${JSON.stringify(r.expected)}</span></div>
-                <div><span class="text-slate-500">실제값:</span> <span class="text-rose-400 font-bold">${JSON.stringify(r.actual)}</span></div>
+              <div class="font-mono text-[11px] bg-black/50 p-2.5 rounded-lg text-slate-300 flex flex-col gap-1.5 mt-1 border border-rose-900/60">
+                ${r.error ? `<div class="text-rose-400 font-sans whitespace-pre-wrap mb-1 pb-1.5 border-b border-rose-900/50">${r.error}</div>` : ""}
+                <div class="flex items-start gap-1.5">
+                  <span class="text-slate-400 shrink-0 font-sans font-semibold">입력값 (Input):</span>
+                  <span class="text-sky-300 font-bold break-all">${formatInputForDisplay(r.input)}</span>
+                </div>
+                <div class="flex items-start gap-1.5">
+                  <span class="text-slate-400 shrink-0 font-sans font-semibold">기댓값 (Expected):</span>
+                  <span class="text-emerald-400 font-bold break-all">${JSON.stringify(r.expected)}</span>
+                </div>
+                <div class="flex items-start gap-1.5">
+                  <span class="text-slate-400 shrink-0 font-sans font-semibold">실제값 (Actual):</span>
+                  <span class="text-rose-400 font-bold break-all">${JSON.stringify(r.actual)}</span>
+                </div>
               </div>
             `
                 : ""

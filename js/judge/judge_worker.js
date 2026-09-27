@@ -16,8 +16,13 @@ import copy
 import traceback
 
 def safe_serialize(obj, depth=0):
-    if depth > 3:
+    if depth > 6:
         return "<depth-limit>"
+    if hasattr(obj, "item"):
+        try:
+            return safe_serialize(obj.item(), depth)
+        except Exception:
+            pass
     if obj is None or isinstance(obj, (int, float, str, bool)):
         return obj
     elif isinstance(obj, (list, tuple)):
@@ -131,8 +136,9 @@ def run_judge_and_trace(user_code, entry_point_name, test_cases_json, record_tra
                 "index": idx + 1,
                 "passed": False,
                 "error": error_msg,
+                "input": safe_serialize(inputs),
                 "actual": None,
-                "expected": expected,
+                "expected": safe_serialize(expected),
                 "elapsed_ms": elapsed_ms
             })
         else:
@@ -143,6 +149,7 @@ def run_judge_and_trace(user_code, entry_point_name, test_cases_json, record_tra
                 "index": idx + 1,
                 "passed": passed,
                 "error": None,
+                "input": safe_serialize(inputs),
                 "actual": safe_serialize(actual),
                 "expected": safe_serialize(expected),
                 "elapsed_ms": elapsed_ms
