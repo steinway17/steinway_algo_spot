@@ -156,6 +156,89 @@ def run_judge_and_trace(user_code, entry_point_name, test_cases_json, record_tra
     })
 `;
 
+// Python harness code for Data Science Judge (pandas, numpy, scipy, sklearn)
+const DS_PYTHON_HARNESS = `
+import json
+import traceback
+import numpy as np
+import pandas as pd
+
+def serialize_df_for_web(df, max_rows=15):
+    if df is None:
+        return None
+    if isinstance(df, pd.Series):
+        df = df.to_frame()
+    if not isinstance(df, pd.DataFrame):
+        if isinstance(df, np.ndarray):
+            cols = [f"col_{i}" for i in range(df.shape[1])] if df.ndim > 1 else ["value"]
+            df = pd.DataFrame(df, columns=cols)
+        else:
+            return str(df)
+            
+    head_df = df.head(max_rows)
+    return {
+        "columns": [str(c) for c in df.columns],
+        "index": [str(i) for i in head_df.index],
+        "data": [[None if pd.isna(v) else (round(float(v), 4) if isinstance(v, (float, np.floating)) else str(v)) for v in row] for row in head_df.values],
+        "shape": list(df.shape),
+        "null_counts": {str(k): int(v) for k, v in df.isnull().sum().items()},
+        "dtypes": {str(k): str(v) for k, v in df.dtypes.items()}
+    }
+
+def run_ds_judge(user_code, problem_id, validation_code):
+    user_globals = {
+        "pd": pd,
+        "np": np,
+        "pandas": pd,
+        "numpy": np
+    }
+    
+    try:
+        compiled = compile(user_code, "<user_code>", "exec")
+        exec(compiled, user_globals)
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "error_type": "CompileError",
+            "error": traceback.format_exc()
+        })
+        
+    if "solution" not in user_globals or not callable(user_globals["solution"]):
+        return json.dumps({
+            "success": False,
+            "error_type": "EntryPointNotFound",
+            "error": "함수 'solution(df)'를 찾을 수 없습니다."
+        })
+        
+    fn = user_globals["solution"]
+    
+    eval_globals = dict(user_globals)
+    eval_globals["user_solution"] = fn
+    eval_globals["serialize_df_for_web"] = serialize_df_for_web
+    
+    try:
+        eval_globals["__validation_output__"] = None
+        indented_code = "\n".join("    " + line for line in validation_code.strip().splitlines())
+        exec_code = f"def __validate__():\n{indented_code}\n__validation_output__ = __validate__()"
+        exec(exec_code, eval_globals)
+        validation_output = eval_globals.get("__validation_output__", {})
+        if not isinstance(validation_output, dict):
+            validation_output = {"all_passed": True, "message": str(validation_output)}
+            
+        return json.dumps({
+            "success": True,
+            **validation_output
+        })
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "error_type": "AssertionError",
+            "error": traceback.format_exc()
+        })
+`;
+
+let isDSReady = false;
+
 async function initPyodide() {
   try {
     importScripts(PYODIDE_CDN);
@@ -172,13 +255,60 @@ async function initPyodide() {
 }
 
 self.onmessage = async function (e) {
-  const { id, type, userCode, entryPoint, testCases, recordTrace } = e.data;
+  const { id, type, userCode, entryPoint, testCases, recordTrace, problemId, validationCode } = e.data;
 
   if (type === "INIT") {
     if (!isReady) {
       await initPyodide();
     } else {
       postMessage({ type: "INIT_SUCCESS" });
+    }
+    return;
+  }
+
+  if (type === "LOAD_DS_PACKAGES") {
+    if (!isReady) {
+      postMessage({ id, type: "LOAD_DS_PACKAGES_ERROR", error: "Pyodide 기본 엔진이 아직 준비되지 않았습니다." });
+      return;
+    }
+    try {
+      if (!isDSReady) {
+        await pyodide.loadPackage(["numpy", "pandas", "scipy", "scikit-learn"]);
+        await pyodide.runPythonAsync(DS_PYTHON_HARNESS);
+        isDSReady = true;
+      }
+      postMessage({ id, type: "LOAD_DS_PACKAGES_SUCCESS" });
+    } catch (err) {
+      postMessage({ id, type: "LOAD_DS_PACKAGES_ERROR", error: err.message || String(err) });
+    }
+    return;
+  }
+
+  if (type === "EXECUTE_DS") {
+    if (!isDSReady) {
+      postMessage({ id, type: "EXECUTE_ERROR", error: "데이터 사이언스 패키지(pandas/sklearn)가 아직 로드되지 않았습니다." });
+      return;
+    }
+    try {
+      pyodide.globals.set("__user_code__", userCode);
+      pyodide.globals.set("__problem_id__", problemId || "");
+      pyodide.globals.set("__validation_code__", validationCode || "");
+
+      const runnerCode = `run_ds_judge(__user_code__, __problem_id__, __validation_code__)`;
+      const rawResult = await pyodide.runPythonAsync(runnerCode);
+      const parsedResult = JSON.parse(rawResult);
+
+      postMessage({
+        id,
+        type: "EXECUTE_DS_SUCCESS",
+        payload: parsedResult
+      });
+    } catch (err) {
+      postMessage({
+        id,
+        type: "EXECUTE_ERROR",
+        error: err.message || String(err)
+      });
     }
     return;
   }

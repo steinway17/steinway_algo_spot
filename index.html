@@ -58,15 +58,27 @@
       <!-- Logo & Title -->
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20">
-          <i data-lucide="cpu" class="w-5 h-5"></i>
+          <i data-lucide="cpu" class="w-5 h-5" id="headerLogoIcon"></i>
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <span class="font-extrabold text-sm tracking-tight text-white">AlgoHarness</span>
+            <span class="font-extrabold text-sm tracking-tight text-white" id="headerBrandTitle">AlgoHarness</span>
             <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-400 border border-sky-500/30">Pyodide Wasm</span>
           </div>
-          <p class="text-[11px] text-slate-400 hidden sm:block">실시간 알고리즘 실행 & 시각화 반복 훈련 하네스</p>
+          <p class="text-[11px] text-slate-400 hidden sm:block" id="headerBrandSubtitle">실시간 알고리즘 실행 & 시각화 반복 훈련 하네스</p>
         </div>
+      </div>
+
+      <!-- Domain Mode Selector (Algo vs DS) -->
+      <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold shadow-inner">
+        <button id="tabModeAlgo" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 text-white shadow-sm transition">
+          <i data-lucide="cpu" class="w-3.5 h-3.5"></i>
+          <span>알고리즘</span>
+        </button>
+        <button id="tabModeDS" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition">
+          <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i>
+          <span>데이터 사이언스</span>
+        </button>
       </div>
 
       <!-- Center Problem Quick Switcher -->
@@ -78,7 +90,7 @@
           <option value="03_valid_parentheses">03. 올바른 괄호 검사 (Stack)</option>
           <option value="04_bfs_maze">04. 미로 최단거리 (BFS Queue)</option>
           <option value="05_dfs_backtracking">05. 수열 생성 (DFS 백트래킹)</option>
-          <option value="06_bipartite_matching">06. 🔗 이분 매칭 & 증가 경로 (심화)</option>
+          <option value="06_bipartite_matching">06. 이분 매칭 & 증가 경로 (DFS)</option>
         </select>
       </div>
 
@@ -229,9 +241,25 @@
     <!-- RIGHT PANEL: Hybrid Visualizer & Judge Output (4 cols) -->
     <section class="lg:col-span-4 flex flex-col gap-3 lg:gap-4 overflow-hidden">
       
-      <!-- Top: Visualizer Hub (Height ~55%) -->
-      <div class="flex-1 min-h-[300px]" id="visualizerContainer">
-        <!-- Injected by VisualizerHub -->
+      <!-- Top: Visualizer Hub / DS Visualizers (Height ~55%) -->
+      <div class="flex-1 min-h-[300px] flex flex-col" id="visualizerOuterContainer">
+        <!-- DS Sub-tabs (hidden in Algo mode) -->
+        <div id="dsVisualizerNav" class="hidden mb-2 flex items-center justify-between bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs">
+          <div class="flex items-center gap-1">
+            <button id="btnDsTabDiff" class="px-2.5 py-1 rounded-lg font-bold bg-emerald-600 text-white shadow-sm transition flex items-center gap-1.5">
+              <i data-lucide="table" class="w-3.5 h-3.5"></i>
+              <span>DataFrame 전/후 비교</span>
+            </button>
+            <button id="btnDsTabTraps" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5">
+              <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Exam Traps (함정 퀴즈)</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex-1" id="visualizerContainer">
+          <!-- Injected by VisualizerHub or DS Visualizers -->
+        </div>
       </div>
 
       <!-- Bottom: Test Case & Judge Output (Height ~45%) -->
@@ -286,7 +314,10 @@
   <script src="js/visualizer/grid_maze_visualizer.js"></script>
   <script src="js/visualizer/recursion_tree_visualizer.js"></script>
   <script src="js/visualizer/graph_visualizer.js"></script>
+  <script src="js/visualizer/bipartite_matching_visualizer.js"></script>
   <script src="js/visualizer/visualizer_hub.js"></script>
+  <script src="js/visualizer/dataframe_diff_visualizer.js"></script>
+  <script src="js/visualizer/exam_traps_visualizer.js"></script>
   <script src="js/editor.js"></script>
 
   <!-- Problem Data Scripts -->
@@ -295,7 +326,14 @@
   <script src="js/data/problems/03_valid_parentheses.js"></script>
   <script src="js/data/problems/04_bfs_maze.js"></script>
   <script src="js/data/problems/05_dfs_backtracking.js"></script>
+  <script src="js/data/problems/06_bipartite_matching.js"></script>
   <script src="js/data/curriculum_graph.js"></script>
+
+  <!-- DS Problem Data Scripts -->
+  <script src="js/data/ds_problems/ds_01_missing_values.js"></script>
+  <script src="js/data/ds_problems/ds_02_iqr_outliers.js"></script>
+  <script src="js/data/ds_problems/ds_03_column_transformer.js"></script>
+  <script src="js/data/ds_curriculum_graph.js"></script>
 
   <!-- App Main -->
   <script src="js/app.js"></script>

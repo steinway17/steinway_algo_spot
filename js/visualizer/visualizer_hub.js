@@ -265,6 +265,11 @@ class VisualizerHub {
         this.graphVisualizer = new GraphVisualizer(this.renderArea);
       }
       this.graphVisualizer.render(frame, this.problemMeta);
+    } else if (type === "bipartite_matching") {
+      if (!this.bipartiteVisualizer) {
+        this.bipartiteVisualizer = new BipartiteMatchingVisualizer(this.renderArea);
+      }
+      this.bipartiteVisualizer.render(frame, this.problemMeta);
     } else {
       // Default fallback to array
       if (!this.arrayVisualizer) {

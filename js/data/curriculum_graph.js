@@ -61,21 +61,19 @@ window.CurriculumGraph = {
       category: "심화 네트워크/매칭",
       difficulty: 3,
       prerequisites: ["04_bfs_maze", "05_dfs_backtracking"],
-      isExternalLink: true,
-      externalUrl: "bipartite_matching.html",
+      dataRef: "PROBLEM_06",
       icon: "git-merge"
     }
   ],
 
   getProblem(id) {
     const node = this.nodes.find((n) => n.id === id);
-    if (!node || node.isExternalLink) return null;
+    if (!node) return null;
     return window[node.dataRef] || null;
   },
 
   getAllProblems() {
     return this.nodes
-      .filter((n) => !n.isExternalLink)
       .map((n) => window[n.dataRef])
       .filter(Boolean);
   },

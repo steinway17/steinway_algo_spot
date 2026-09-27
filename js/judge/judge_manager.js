@@ -7,6 +7,8 @@ class JudgeManager {
     this.workerPath = workerPath;
     this.worker = null;
     this.isReady = false;
+    this.isDSLoaded = false;
+    this.dsLoadingPromise = null;
     this.statusListeners = [];
     this.currentExecution = null;
     this.initWorker();
@@ -30,6 +32,8 @@ class JudgeManager {
     }
 
     this.isReady = false;
+    this.isDSLoaded = false;
+    this.dsLoadingPromise = null;
     this.notifyStatus("loading", "Pyodide WebAssembly 런타임 초기화 중...");
 
     this.worker = new Worker(this.workerPath);
@@ -54,7 +58,7 @@ class JudgeManager {
         const { resolve } = this.currentExecution;
         this.currentExecution = null;
 
-        if (type === "EXECUTE_SUCCESS") {
+        if (type === "EXECUTE_SUCCESS" || type === "EXECUTE_DS_SUCCESS" || type === "LOAD_DS_PACKAGES_SUCCESS") {
           resolve({
             ok: true,
             data: payload
@@ -133,6 +137,118 @@ class JudgeManager {
         entryPoint,
         testCases,
         recordTrace
+      });
+    });
+  }
+
+  async loadDSPackages() {
+    if (!this.isReady) {
+      await new Promise((resolve) => {
+        const check = () => {
+          if (this.isReady) resolve();
+          else setTimeout(check, 100);
+        };
+        check();
+      });
+    }
+
+    if (this.isDSLoaded) return { ok: true };
+    if (this.dsLoadingPromise) return this.dsLoadingPromise;
+
+    this.notifyStatus("loading_ds", "데이터 사이언스 라이브러리(numpy, pandas, scikit-learn) 로딩 중...");
+
+    const execId = "load_ds_" + Date.now();
+    this.dsLoadingPromise = new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        if (this.currentExecution && this.currentExecution.id === execId) {
+          this.currentExecution = null;
+          this.dsLoadingPromise = null;
+          resolve({
+            ok: false,
+            error: "데이터 사이언스 패키지 로딩 시간이 초과되었습니다 (네트워크 상태를 확인하세요)."
+          });
+        }
+      }, 60000); // 60s for pyodide cdn downloads
+
+      this.currentExecution = {
+        id: execId,
+        timer,
+        resolve: (res) => {
+          if (res.ok) {
+            this.isDSLoaded = true;
+            this.notifyStatus("ready_ds", "데이터 사이언스 패키지 로드 완료");
+          } else {
+            this.notifyStatus("error", `데이터 사이언스 패키지 로드 실패: ${res.error}`);
+          }
+          this.dsLoadingPromise = null;
+          resolve(res);
+        }
+      };
+
+      this.worker.postMessage({
+        id: execId,
+        type: "LOAD_DS_PACKAGES"
+      });
+    });
+
+    return this.dsLoadingPromise;
+  }
+
+  async runDSJudge({
+    userCode,
+    problemId,
+    validationCode,
+    timeoutMs = 12000
+  }) {
+    if (!this.isReady) {
+      return {
+        ok: false,
+        error: "Pyodide 런타임이 아직 로드 중입니다. 잠시만 기다려주세요."
+      };
+    }
+
+    if (!this.isDSLoaded) {
+      const loadRes = await this.loadDSPackages();
+      if (!loadRes.ok) {
+        return loadRes;
+      }
+    }
+
+    if (this.currentExecution) {
+      return {
+        ok: false,
+        error: "이미 다른 코드가 실행 중입니다."
+      };
+    }
+
+    const execId = "exec_ds_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
+
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        if (this.currentExecution && this.currentExecution.id === execId) {
+          console.warn(`DS Execution timed out (${timeoutMs}ms). Terminating worker...`);
+          this.initWorker();
+          this.currentExecution = null;
+          resolve({
+            ok: false,
+            errorType: "TLE",
+            error: `시간 초과 (Time Limit Exceeded - ${(timeoutMs / 1000).toFixed(1)}초): 무한 루프 또는 비효율적인 연산이 감지되었습니다.`
+          });
+        }
+      }, timeoutMs);
+
+      this.currentExecution = {
+        id: execId,
+        timer,
+        resolve
+      };
+
+      this.worker.postMessage({
+        id: execId,
+        type: "EXECUTE_DS",
+        userCode,
+        problemId,
+        validationCode
       });
     });
   }
