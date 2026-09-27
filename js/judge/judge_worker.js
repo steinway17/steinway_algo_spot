@@ -218,8 +218,9 @@ def run_ds_judge(user_code, problem_id, validation_code):
     
     try:
         eval_globals["__validation_output__"] = None
-        indented_code = "\n".join("    " + line for line in validation_code.strip().splitlines())
-        exec_code = f"def __validate__():\n{indented_code}\n__validation_output__ = __validate__()"
+        lines = validation_code.strip().splitlines()
+        indented_lines = [("    " + line) for line in lines]
+        exec_code = "def __validate__():" + chr(10) + chr(10).join(indented_lines) + chr(10) + "__validation_output__ = __validate__()"
         exec(exec_code, eval_globals)
         validation_output = eval_globals.get("__validation_output__", {})
         if not isinstance(validation_output, dict):
