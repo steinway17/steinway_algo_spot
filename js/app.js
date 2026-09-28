@@ -61,6 +61,19 @@ class AlgorithmHarnessApp {
     // 4. DS Visualizers
     this.dfVisualizer = new DataFrameDiffVisualizer(document.getElementById("visualizerContainer"));
     this.examTrapsVisualizer = new ExamTrapsVisualizer(document.getElementById("visualizerContainer"));
+
+    // 5. Resizable Split Panes (Horizontal 3-panel layout)
+    this.panelSplitter = new PanelSplitter({
+      containerId: "workspaceContainer",
+      panelIds: ["panelProblem", "panelEditor", "panelVisualizer"],
+      gutterIds: ["gutterProblemEditor", "gutterEditorVisualizer"],
+      minWidths: [260, 280, 280],
+      defaultPercentages: [30, 35, 35],
+      onResize: () => {
+        this.editor?.refresh();
+        window.dispatchEvent(new Event("resize"));
+      }
+    });
   }
 
   bindEvents() {

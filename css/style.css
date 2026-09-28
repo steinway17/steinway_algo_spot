@@ -37,3 +37,68 @@
 .glow-sky {
   box-shadow: 0 0 20px -5px rgba(14, 165, 233, 0.4);
 }
+
+/* Split Gutters & Resizable Panels */
+.split-gutter-col {
+  width: 14px;
+  margin: 0 -2px;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 20;
+  transition: background-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.split-gutter-col:hover,
+.split-gutter-col.is-dragging {
+  background-color: rgba(14, 165, 233, 0.15);
+  border-radius: 8px;
+}
+
+.split-gutter-col .gutter-handle {
+  width: 4px;
+  height: 44px;
+  border-radius: 9999px;
+  background-color: #334155; /* slate-700 */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.split-gutter-col:hover .gutter-handle,
+.split-gutter-col.is-dragging .gutter-handle {
+  background-color: #38bdf8; /* sky-400 */
+  height: 72px;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+}
+
+/* While resizing, disable pointer events on panels to avoid selection / text selection */
+#workspaceContainer.is-resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+#workspaceContainer.is-resizing .panel-column {
+  pointer-events: none !important;
+  transition: none !important;
+}
+
+body.select-none-resizing {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  cursor: col-resize !important;
+}
+
+/* Responsive fallback for tablets/mobiles */
+@media (max-width: 1023px) {
+  .panel-column {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    min-height: 450px !important;
+  }
+}
+
