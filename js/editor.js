@@ -3,10 +3,12 @@
  */
 
 class CodeEditor {
-  constructor({ textareaId, onRunShortcut }) {
+  constructor({ textareaId, onRunShortcut, onChange }) {
     this.textarea = document.getElementById(textareaId);
     this.onRunShortcut = onRunShortcut || (() => {});
+    this.onChange = onChange || (() => {});
     this.highlightedLineHandle = null;
+    this.isSilent = false;
     this.initCM();
   }
 
@@ -46,6 +48,11 @@ class CodeEditor {
       }
     });
 
+    this.cm.on("change", (cm, changeObj) => {
+      if (this.isSilent) return;
+      this.onChange(cm.getValue(), changeObj);
+    });
+
     this.cm.setSize("100%", "100%");
   }
 
@@ -53,10 +60,15 @@ class CodeEditor {
     return this.cm ? this.cm.getValue() : this.textarea.value;
   }
 
-  setValue(code) {
+  setValue(code, silent = true) {
     if (this.cm) {
-      this.cm.setValue(code || "");
-      this.clearHighlight();
+      if (silent) this.isSilent = true;
+      try {
+        this.cm.setValue(code || "");
+        this.clearHighlight();
+      } finally {
+        if (silent) this.isSilent = false;
+      }
     } else {
       this.textarea.value = code || "";
     }

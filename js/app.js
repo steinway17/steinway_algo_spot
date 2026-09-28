@@ -13,6 +13,7 @@ class AlgorithmHarnessApp {
     this.lastDsResult = null;
     this.speedTimer = null;
     this.speedRemainingSec = 180;
+    this.autoSaveTimer = null;
 
     this.initComponents();
     this.bindEvents();
@@ -38,10 +39,11 @@ class AlgorithmHarnessApp {
       }
     });
 
-    // 2. Code Editor
+    // 2. Code Editor with debounced auto-save
     this.editor = new CodeEditor({
       textareaId: "pythonCodeEditor",
-      onRunShortcut: () => this.handleRunJudge()
+      onRunShortcut: () => this.handleRunJudge(),
+      onChange: (code) => this.handleCodeChange(code)
     });
 
     // 3. Visualizer Hub (Algo)
@@ -119,8 +121,8 @@ class AlgorithmHarnessApp {
     document.getElementById("btnDsTabTraps")?.addEventListener("click", () => this.switchDsVisualizerTab("traps"));
   }
 
-  switchDomain(domain) {
-    if (this.currentDomain === domain) return;
+  switchDomain(domain, targetProblemId = null, targetMode = null) {
+    if (this.currentDomain === domain && !targetProblemId) return;
     this.currentDomain = domain;
 
     const tabAlgo = document.getElementById("tabModeAlgo");
@@ -149,8 +151,8 @@ class AlgorithmHarnessApp {
       // Preload DS packages in background
       this.judgeManager.loadDSPackages();
 
-      // Load first DS problem
-      this.loadProblem("ds_01_missing_values");
+      // Load DS problem
+      this.loadProblem(targetProblemId || "ds_01_missing_values", targetMode);
     } else {
       tabAlgo.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 text-white shadow-sm transition";
       tabDS.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition";
@@ -173,9 +175,11 @@ class AlgorithmHarnessApp {
       // Re-init Algo Visualizer Hub UI inside container
       this.visualizerHub.initUI();
 
-      // Load first Algo problem
-      this.loadProblem("01_two_pointers");
+      // Load Algo problem
+      this.loadProblem(targetProblemId || "01_two_pointers", targetMode);
     }
+
+    this.updateHeaderMasteryBadge();
   }
 
   switchDsVisualizerTab(tab) {
@@ -199,12 +203,47 @@ class AlgorithmHarnessApp {
     if (window.lucide) lucide.createIcons();
   }
 
+  handleCodeChange(code) {
+    if (!this.currentProblem) return;
+
+    const indicator = document.getElementById("autoSaveIndicator");
+    if (indicator) {
+      indicator.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 text-amber-400 animate-spin"></i><span class="text-amber-300">저장 중...</span>`;
+      if (window.lucide) lucide.createIcons({ root: indicator });
+    }
+
+    clearTimeout(this.autoSaveTimer);
+    this.autoSaveTimer = setTimeout(() => {
+      this.masteryStore.saveCode(this.currentProblem.id, this.currentMode, code);
+      this.masteryStore.saveLastSession({
+        domain: this.currentDomain,
+        problemId: this.currentProblem.id,
+        mode: this.currentMode
+      });
+      if (indicator) {
+        indicator.innerHTML = `<i data-lucide="check" class="w-3 h-3 text-emerald-400"></i><span class="text-slate-400">저장됨</span>`;
+        if (window.lucide) lucide.createIcons({ root: indicator });
+      }
+    }, 400);
+  }
+
   loadInitialProblem() {
+    const lastSession = this.masteryStore.getLastSession();
+    if (lastSession && lastSession.domain && lastSession.problemId) {
+      if (lastSession.domain === "ds") {
+        this.switchDomain("ds", lastSession.problemId, lastSession.mode);
+        return;
+      } else {
+        this.loadProblem(lastSession.problemId, lastSession.mode);
+        return;
+      }
+    }
+
     const defaultId = "01_two_pointers";
     this.loadProblem(defaultId);
   }
 
-  loadProblem(problemId) {
+  loadProblem(problemId, targetMode = null) {
     const isDS = problemId.startsWith("ds_");
     const problem = isDS
       ? window.DSCurriculumGraph.getProblem(problemId)
@@ -250,8 +289,25 @@ class AlgorithmHarnessApp {
       this.visualizerHub.initUI();
     }
 
-    // Load problem in current mode
-    this.switchMode(state.level === "observe" ? "observe" : state.level);
+    // Determine mode to load
+    let modeToLoad = "observe";
+    if (targetMode) {
+      const isBlankUnlocked = state.blankPassed || state.level === "blank" || state.level === "speed" || state.level === "mastered";
+      const isSpeedUnlocked = state.level === "speed" || state.level === "mastered";
+      if (targetMode === "speed" && isSpeedUnlocked) {
+        modeToLoad = "speed";
+      } else if (targetMode === "blank" && isBlankUnlocked) {
+        modeToLoad = "blank";
+      } else if (targetMode === "fill") {
+        modeToLoad = "fill";
+      }
+    } else {
+      modeToLoad = state.level === "observe" ? "observe" : state.level;
+    }
+
+    // Load problem in determined mode
+    this.switchMode(modeToLoad);
+    this.updateHeaderMasteryBadge();
   }
 
   updateModeTabsLock(state) {
@@ -283,6 +339,14 @@ class AlgorithmHarnessApp {
     this.currentMode = mode;
     this.stopSpeedTimer();
 
+    if (this.currentProblem) {
+      this.masteryStore.saveLastSession({
+        domain: this.currentDomain,
+        problemId: this.currentProblem.id,
+        mode: this.currentMode
+      });
+    }
+
     // Update Tab UI active styles
     document.querySelectorAll(".drill-mode-tab").forEach((tab) => {
       if (tab.dataset.mode === mode) {
@@ -295,11 +359,13 @@ class AlgorithmHarnessApp {
     const speedrunBar = document.getElementById("speedrunBar");
     const fillHintsSection = document.getElementById("fillHintsSection");
 
+    const savedCode = this.masteryStore.getSavedCode(this.currentProblem.id, mode);
+
     // Mode-specific UI adjustments
     if (mode === "observe") {
       speedrunBar?.classList.add("hidden");
       fillHintsSection?.classList.add("hidden");
-      this.editor.setValue(this.currentProblem.solutionTemplate);
+      this.editor.setValue(savedCode || this.currentProblem.solutionTemplate);
       this.editor.setReadOnly(false);
       // Auto run first test case to show trace visualizer immediately
       this.handleRunJudge(false);
@@ -307,7 +373,7 @@ class AlgorithmHarnessApp {
       speedrunBar?.classList.add("hidden");
       fillHintsSection?.classList.remove("hidden");
       this.renderFillHints();
-      this.editor.setValue(this.currentProblem.blankTemplate);
+      this.editor.setValue(savedCode || this.currentProblem.blankTemplate);
       this.editor.setReadOnly(false);
     } else if (mode === "blank") {
       speedrunBar?.classList.add("hidden");
@@ -317,7 +383,7 @@ class AlgorithmHarnessApp {
       const signatureOnly = isDS
         ? `import pandas as pd\nimport numpy as np\n\ndef solution(df):\n    # 백지 상태에서 데이터프레임 변환 파이프라인을 자력으로 구현해보세요!\n    pass\n`
         : `def solution(${this.getFunctionArgs(this.currentProblem.solutionTemplate)}):\n    # 백지 상태에서 알고리즘을 처음부터 자력으로 구현해보세요!\n    pass\n`;
-      this.editor.setValue(signatureOnly);
+      this.editor.setValue(savedCode || signatureOnly);
       this.editor.setReadOnly(false);
     } else if (mode === "speed") {
       speedrunBar?.classList.remove("hidden");
@@ -326,7 +392,7 @@ class AlgorithmHarnessApp {
       const signatureOnly = isDS
         ? `import pandas as pd\nimport numpy as np\n\ndef solution(df):\n    # 3분 스피드런! 실기 시험처럼 지체 없이 파이프라인을 완성하세요.\n    pass\n`
         : `def solution(${this.getFunctionArgs(this.currentProblem.solutionTemplate)}):\n    # 3분 스피드런! 망설임 없이 즉각 작성하세요.\n    pass\n`;
-      this.editor.setValue(signatureOnly);
+      this.editor.setValue(savedCode || signatureOnly);
       this.editor.setReadOnly(false);
       this.startSpeedTimer();
     }
@@ -355,6 +421,11 @@ class AlgorithmHarnessApp {
   }
 
   resetCodeToTemplate() {
+    if (!this.currentProblem) return;
+    const confirmReset = confirm("현재 작성 중인 코드를 지우고 기본 템플릿으로 되돌리시겠습니까?");
+    if (!confirmReset) return;
+
+    this.masteryStore.clearSavedCode(this.currentProblem.id, this.currentMode);
     this.switchMode(this.currentMode);
   }
 
@@ -763,6 +834,7 @@ class AlgorithmHarnessApp {
 
     const updatedState = this.masteryStore.recordPass(pId, this.currentMode, elapsedSec);
     this.updateModeTabsLock(updatedState);
+    this.updateHeaderMasteryBadge();
 
     // Fire Confetti!
     if (window.confetti) {
@@ -927,6 +999,23 @@ class AlgorithmHarnessApp {
         document.getElementById("curriculumModal")?.classList.add("hidden");
       });
     });
+  }
+
+  updateHeaderMasteryBadge() {
+    const badge = document.getElementById("headerMasteryBadge");
+    if (!badge) return;
+
+    if (this.currentDomain === "ds") {
+      const allProblems = window.DSCurriculumGraph.getAllProblems();
+      const stats = this.masteryStore.getAllStats(allProblems);
+      badge.textContent = `${stats.masteredCount}/${stats.total} 마스터`;
+      badge.className = "ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+    } else {
+      const allProblems = window.CurriculumGraph.getAllProblems();
+      const stats = this.masteryStore.getAllStats(allProblems);
+      badge.textContent = `${stats.masteredCount}/${stats.total} 마스터`;
+      badge.className = "ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30";
+    }
   }
 }
 

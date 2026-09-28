@@ -32,25 +32,54 @@ class MasteryStore {
       this.data.problems[problemId] = {
         level: "observe", // "observe" | "fill" | "blank" | "speed" | "mastered"
         blankPassed: false,
-        blankCode: null,
-        userCode: null,
         speedPassed: false,
         bestSpeedSec: null,
         passCount: 0,
-        lastPassedAt: null
+        lastPassedAt: null,
+        codeDrafts: {}
       };
       this.save();
     }
-    return this.data.problems[problemId];
+    const state = this.data.problems[problemId];
+    if (!state.codeDrafts) {
+      state.codeDrafts = {};
+      if (state.blankCode) state.codeDrafts.fill = state.blankCode;
+      if (state.userCode) state.codeDrafts.blank = state.userCode;
+    }
+    return state;
   }
 
-  saveCode(problemId, code, mode) {
+  saveCode(problemId, mode, code) {
     const state = this.getProblemState(problemId);
-    if (mode === "fill") {
-      state.blankCode = code;
-    } else {
-      state.userCode = code;
+    if (!state.codeDrafts) state.codeDrafts = {};
+    state.codeDrafts[mode] = code;
+    this.save();
+  }
+
+  getSavedCode(problemId, mode) {
+    const state = this.getProblemState(problemId);
+    return state.codeDrafts ? (state.codeDrafts[mode] ?? null) : null;
+  }
+
+  clearSavedCode(problemId, mode) {
+    const state = this.getProblemState(problemId);
+    if (state.codeDrafts && state.codeDrafts[mode] !== undefined) {
+      delete state.codeDrafts[mode];
+      this.save();
     }
+  }
+
+  getLastSession() {
+    return this.data.lastSession || null;
+  }
+
+  saveLastSession({ domain, problemId, mode }) {
+    this.data.lastSession = {
+      domain,
+      problemId,
+      mode,
+      updatedAt: Date.now()
+    };
     this.save();
   }
 
