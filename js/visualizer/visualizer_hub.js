@@ -285,18 +285,22 @@ class VisualizerHub {
 
         // Detect if value changed compared to previous frame
         let hasChanged = false;
-        if (prevLocals && prevLocals[k] !== undefined) {
-          const prevStr = typeof prevLocals[k] === "object" ? JSON.stringify(prevLocals[k]) : String(prevLocals[k]);
-          if (prevStr !== rawStr) {
+        if (prevLocals) {
+          if (prevLocals[k] === undefined) {
             hasChanged = true;
+          } else {
+            const prevStr = typeof prevLocals[k] === "object" ? JSON.stringify(prevLocals[k]) : String(prevLocals[k]);
+            if (prevStr !== rawStr) {
+              hasChanged = true;
+            }
           }
         }
 
         const cardClass = hasChanged
-          ? "bg-emerald-950/60 border-emerald-500/60 shadow-sm shadow-emerald-500/10 text-emerald-200"
-          : "bg-slate-900/90 border-slate-700/70 hover:border-slate-600 text-slate-200";
+          ? "bg-emerald-950/80 border-emerald-500/80 shadow-md shadow-emerald-500/20 text-emerald-100 ring-1 ring-emerald-500/40"
+          : "bg-slate-900/90 border-slate-700/80 hover:border-slate-600 text-slate-200";
 
-        const valClass = hasChanged ? "text-emerald-300 font-bold" : "text-amber-300 font-bold";
+        const valClass = hasChanged ? "text-emerald-300 font-extrabold" : "text-amber-300 font-bold";
         const titleAttr = rawStr.replace(/"/g, "&quot;");
 
         return `
@@ -304,7 +308,7 @@ class VisualizerHub {
             <span class="text-sky-300 font-semibold">${k}</span>
             <span class="text-slate-500 font-mono text-[11px]">=</span>
             <span class="${valClass} break-all">${displayStr}</span>
-            ${hasChanged ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>` : ""}
+            ${hasChanged ? `<span class="px-1 py-0.2 rounded text-[9px] font-bold bg-emerald-500/30 text-emerald-300 border border-emerald-500/40">변화</span>` : ""}
           </div>
         `;
       })

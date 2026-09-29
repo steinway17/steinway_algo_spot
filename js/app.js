@@ -30,6 +30,11 @@ class AlgorithmHarnessApp {
       if (status === "ready" || status === "ready_ds") {
         this.statusBadge.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
         this.statusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> ${status === 'ready_ds' ? 'DS 엔진 Ready' : 'Pyodide Ready'}`;
+
+        // Auto run observe mode trace as soon as Pyodide is ready if not loaded yet
+        if (this.currentMode === "observe" && (!this.visualizerHub?.frames || this.visualizerHub.frames.length === 0)) {
+          this.handleRunJudge(false);
+        }
       } else if (status === "loading" || status === "loading_ds") {
         this.statusBadge.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20";
         this.statusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-spin"></span> ${detail || '로딩 중...'}`;
@@ -380,8 +385,10 @@ class AlgorithmHarnessApp {
       fillHintsSection?.classList.add("hidden");
       this.editor.setValue(savedCode || this.currentProblem.solutionTemplate);
       this.editor.setReadOnly(false);
-      // Auto run first test case to show trace visualizer immediately
-      this.handleRunJudge(false);
+      // Auto run first test case to show trace visualizer immediately if judge is ready
+      if (this.judgeManager?.isReady) {
+        this.handleRunJudge(false);
+      }
     } else if (mode === "fill") {
       speedrunBar?.classList.add("hidden");
       fillHintsSection?.classList.remove("hidden");
