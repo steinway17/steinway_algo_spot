@@ -64,21 +64,36 @@ class VisualizerHub {
           <input type="range" id="visSlider" min="0" max="0" value="0" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500 disabled:opacity-30" disabled />
         </div>
 
+        <!-- Top Variables Watcher (Multi-line Inspector above canvas) -->
+        <div class="px-4 py-2 bg-slate-950/75 border-b border-slate-800 flex flex-col gap-1.5 transition-all duration-200" id="visVarsBar">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-4 h-4 rounded bg-sky-500/20 text-sky-400 text-[10px] font-bold">
+                <i data-lucide="variable" class="w-3 h-3"></i>
+              </span>
+              <span class="text-slate-400 text-[11px] uppercase tracking-wider font-semibold">Variables (실시간 변수 상태)</span>
+              <span id="visVarsCountBadge" class="hidden px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700">0</span>
+            </div>
+            
+            <button id="btnToggleVarsCollapse" class="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition" title="변수 영역 펼치기/접기">
+              <span id="varsCollapseLabel">접기</span>
+              <i data-lucide="chevron-up" class="w-3 h-3" id="varsCollapseIcon"></i>
+            </button>
+          </div>
+
+          <!-- Multi-line wrap container for variables -->
+          <div id="visVarsContent" class="flex flex-wrap items-center gap-1.5 text-xs font-mono max-h-36 overflow-y-auto pr-1">
+            <span class="text-slate-600 text-xs italic">코드를 실행하면 변수 상태가 표시됩니다.</span>
+          </div>
+        </div>
+
         <!-- Main Visualizer Canvas Area -->
-        <div class="relative flex-1 p-4 overflow-auto min-h-[220px] flex flex-col justify-center items-center" id="visCanvasContainer">
+        <div class="relative flex-1 p-4 overflow-auto min-h-[200px] flex flex-col justify-center items-center" id="visCanvasContainer">
           <div id="visEmptyState" class="text-center text-slate-500 py-10">
             <i data-lucide="activity" class="w-10 h-10 mx-auto mb-2 text-slate-600 stroke-1"></i>
             <p class="text-xs">코드를 실행하면 알고리즘의 동작 과정과<br/>자료구조 변화가 이곳에 시각화됩니다.</p>
           </div>
           <div id="visCanvasRenderArea" class="w-full h-full hidden flex flex-col items-center justify-center"></div>
-        </div>
-
-        <!-- Bottom Local Variables Watcher -->
-        <div class="px-4 py-2 bg-slate-950/70 border-t border-slate-800 flex items-center gap-2 overflow-x-auto text-xs font-mono" id="visVarsBar">
-          <span class="text-slate-500 text-[11px] uppercase tracking-wider font-semibold shrink-0">Variables:</span>
-          <div id="visVarsContent" class="flex items-center gap-2 text-slate-300">
-            <span class="text-slate-600">-</span>
-          </div>
         </div>
       </div>
     `;
@@ -102,6 +117,24 @@ class VisualizerHub {
     this.emptyState = this.container.querySelector("#visEmptyState");
     this.renderArea = this.container.querySelector("#visCanvasRenderArea");
     this.varsContent = this.container.querySelector("#visVarsContent");
+    this.btnToggleVars = this.container.querySelector("#btnToggleVarsCollapse");
+    this.varsCollapseLabel = this.container.querySelector("#varsCollapseLabel");
+    this.varsCollapseIcon = this.container.querySelector("#varsCollapseIcon");
+    this.isVarsCollapsed = false;
+
+    this.btnToggleVars?.addEventListener("click", () => {
+      this.isVarsCollapsed = !this.isVarsCollapsed;
+      if (this.isVarsCollapsed) {
+        this.varsContent.classList.add("hidden");
+        this.varsCollapseLabel.textContent = "펼치기";
+        this.varsCollapseIcon?.setAttribute("data-lucide", "chevron-down");
+      } else {
+        this.varsContent.classList.remove("hidden");
+        this.varsCollapseLabel.textContent = "접기";
+        this.varsCollapseIcon?.setAttribute("data-lucide", "chevron-up");
+      }
+      if (window.lucide) lucide.createIcons({ root: this.btnToggleVars });
+    });
 
     this.prevBtn?.addEventListener("click", () => this.stepPrev());
     this.nextBtn?.addEventListener("click", () => this.stepNext());
@@ -131,7 +164,9 @@ class VisualizerHub {
       this.stepBadge.textContent = "0 / 0";
       this.emptyState.classList.remove("hidden");
       this.renderArea.classList.add("hidden");
-      this.varsContent.innerHTML = `<span class="text-slate-600">-</span>`;
+      this.varsContent.innerHTML = `<span class="text-slate-600 text-xs italic">코드를 실행하면 변수 상태가 표시됩니다.</span>`;
+      const countBadge = this.container.querySelector("#visVarsCountBadge");
+      if (countBadge) countBadge.classList.add("hidden");
       return;
     }
 
@@ -149,12 +184,13 @@ class VisualizerHub {
 
   seekTo(index) {
     if (index < 0 || index >= this.frames.length) return;
+    const prevFrame = this.currentIndex >= 0 && this.currentIndex !== index ? this.frames[this.currentIndex] : null;
     this.currentIndex = index;
     this.slider.value = index;
     this.stepBadge.textContent = `${index + 1} / ${this.frames.length}`;
 
     const frame = this.frames[index];
-    this.updateVariablesView(frame.locals);
+    this.updateVariablesView(frame.locals, prevFrame ? prevFrame.locals : null);
     this.renderVisualCanvas(frame);
     this.onFrameChange(frame);
   }
@@ -217,23 +253,59 @@ class VisualizerHub {
     if (window.lucide) lucide.createIcons({ root: this.playBtn });
   }
 
-  updateVariablesView(locals = {}) {
+  updateVariablesView(locals = {}, prevLocals = null) {
     if (!this.varsContent) return;
+    const countBadge = this.container.querySelector("#visVarsCountBadge");
+
+    if (!locals || typeof locals !== "object") {
+      this.varsContent.innerHTML = `<span class="text-slate-600 text-xs italic">로컬 변수 없음</span>`;
+      if (countBadge) countBadge.classList.add("hidden");
+      return;
+    }
+
     const entries = Object.entries(locals);
     if (entries.length === 0) {
-      this.varsContent.innerHTML = `<span class="text-slate-600">no local variables</span>`;
+      this.varsContent.innerHTML = `<span class="text-slate-600 text-xs italic">로컬 변수 없음</span>`;
+      if (countBadge) countBadge.classList.add("hidden");
       return;
+    }
+
+    if (countBadge) {
+      countBadge.textContent = `${entries.length}개`;
+      countBadge.classList.remove("hidden");
     }
 
     const html = entries
       .map(([k, v]) => {
-        let valStr = typeof v === "object" ? JSON.stringify(v) : String(v);
-        if (valStr.length > 25) valStr = valStr.substring(0, 22) + "...";
+        let rawStr = typeof v === "object" ? JSON.stringify(v) : String(v);
+        let displayStr = rawStr;
+        if (displayStr.length > 36) {
+          displayStr = displayStr.substring(0, 33) + "...";
+        }
+
+        // Detect if value changed compared to previous frame
+        let hasChanged = false;
+        if (prevLocals && prevLocals[k] !== undefined) {
+          const prevStr = typeof prevLocals[k] === "object" ? JSON.stringify(prevLocals[k]) : String(prevLocals[k]);
+          if (prevStr !== rawStr) {
+            hasChanged = true;
+          }
+        }
+
+        const cardClass = hasChanged
+          ? "bg-emerald-950/60 border-emerald-500/60 shadow-sm shadow-emerald-500/10 text-emerald-200"
+          : "bg-slate-900/90 border-slate-700/70 hover:border-slate-600 text-slate-200";
+
+        const valClass = hasChanged ? "text-emerald-300 font-bold" : "text-amber-300 font-bold";
+        const titleAttr = rawStr.replace(/"/g, "&quot;");
+
         return `
-          <span class="inline-flex items-center px-2 py-0.5 rounded bg-slate-800 border border-slate-700/80">
-            <span class="text-sky-400 font-semibold mr-1">${k}:</span>
-            <span class="text-amber-300 font-bold">${valStr}</span>
-          </span>
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono shadow-sm transition-all duration-150 ${cardClass}" title="${k} = ${titleAttr}">
+            <span class="text-sky-300 font-semibold">${k}</span>
+            <span class="text-slate-500 font-mono text-[11px]">=</span>
+            <span class="${valClass} break-all">${displayStr}</span>
+            ${hasChanged ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>` : ""}
+          </div>
         `;
       })
       .join("");
